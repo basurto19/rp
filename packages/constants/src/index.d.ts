@@ -1,0 +1,84 @@
+export declare const APP_CONFIG: {
+    readonly API_VERSION: "v1";
+    readonly SERVER_PORT: 3000;
+    readonly MAX_FILE_SIZE: 5242880;
+    readonly RATE_LIMIT_MAX: 100;
+    readonly RATE_LIMIT_WINDOW_MS: 900000;
+    readonly JWT_EXPIRES_IN: "15m";
+    readonly JWT_REFRESH_EXPIRES_IN: "7d";
+    readonly BCRYPT_SALT_ROUNDS: 12;
+    readonly SERVER_SELECTION_TIMEOUT_MS: 5000;
+};
+export declare const ROLES: {
+    readonly SUPER_ADMIN: "super_admin";
+    readonly ADMIN: "admin";
+    readonly SELLER: "seller";
+    readonly WAREHOUSE: "warehouse";
+    readonly FINANCE: "finance";
+    readonly HR: "hr";
+    readonly VIEWER: "viewer";
+};
+export type RoleType = (typeof ROLES)[keyof typeof ROLES];
+export declare const MODULES: {
+    readonly AUTH: "auth";
+    readonly USERS: "users";
+    readonly ROLES: "roles";
+    readonly COMPANIES: "companies";
+    readonly BRANCHES: "branches";
+    readonly CUSTOMERS: "customers";
+    readonly PRODUCTS: "products";
+    readonly SUPPLIERS: "suppliers";
+    readonly INVENTORY: "inventory";
+    readonly SALES: "sales";
+    readonly PURCHASES: "purchases";
+    readonly FINANCE: "finance";
+    readonly REPORTS: "reports";
+    readonly WORKFLOWS: "workflows";
+    readonly NOTIFICATIONS: "notifications";
+    readonly HR: "hr";
+    readonly PROJECTS: "projects";
+    readonly PRODUCTION: "production";
+    readonly SETTINGS: "settings";
+    readonly AUDIT: "audit";
+};
+export type ModuleType = (typeof MODULES)[keyof typeof MODULES];
+export declare const ACTIONS: {
+    readonly CREATE: "create";
+    readonly READ: "read";
+    readonly UPDATE: "update";
+    readonly DELETE: "delete";
+    readonly EXPORT: "export";
+    readonly APPROVE: "approve";
+};
+export type ActionType = (typeof ACTIONS)[keyof typeof ACTIONS];
+export declare const ERROR_CODES: {
+    readonly VALIDATION_ERROR: "VALIDATION_ERROR";
+    readonly INVALID_INPUT: "INVALID_INPUT";
+    readonly MISSING_REQUIRED_FIELD: "MISSING_REQUIRED_FIELD";
+    readonly INVALID_CREDENTIALS: "INVALID_CREDENTIALS";
+    readonly TOKEN_EXPIRED: "TOKEN_EXPIRED";
+    readonly INVALID_TOKEN: "INVALID_TOKEN";
+    readonly USER_NOT_FOUND: "USER_NOT_FOUND";
+    readonly USER_LOCKED: "USER_LOCKED";
+    readonly PASSWORD_MISMATCH: "PASSWORD_MISMATCH";
+    readonly UNAUTHORIZED: "UNAUTHORIZED";
+    readonly FORBIDDEN: "FORBIDDEN";
+    readonly MISSING_PERMISSION: "MISSING_PERMISSION";
+    readonly RESOURCE_NOT_FOUND: "RESOURCE_NOT_FOUND";
+    readonly DUPLICATE_RESOURCE: "DUPLICATE_RESOURCE";
+    readonly DATABASE_ERROR: "DATABASE_ERROR";
+    readonly CONNECTION_ERROR: "CONNECTION_ERROR";
+    readonly INTERNAL_SERVER_ERROR: "INTERNAL_SERVER_ERROR";
+    readonly UNKNOWN_ERROR: "UNKNOWN_ERROR";
+};
+export declare const HTTP_STATUS: {
+    readonly OK: 200;
+    readonly CREATED: 201;
+    readonly BAD_REQUEST: 400;
+    readonly UNAUTHORIZED: 401;
+    readonly FORBIDDEN: 403;
+    readonly NOT_FOUND: 404;
+    readonly CONFLICT: 409;
+    readonly INTERNAL_SERVER_ERROR: 500;
+};
+//# sourceMappingURL=index.d.ts.map

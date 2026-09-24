@@ -1,0 +1,10 @@
+// apps/api/tests/tsconfig.json
+
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "outDir": "./dist-test"
+  },
+  "include": ["**/*.ts"]
+}

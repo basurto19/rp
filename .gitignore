@@ -1,0 +1,29 @@
+node_modules/
+dist/
+build/
+.env
+.env.*
+!.env.example
+.env.local
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+.eslintcache
+.prettierignore
+# MongoDB local
+*.mongodb
+# OS
+__pycache__/
+*.pyc
+# IDE
+*.swp
+*.swo
+*~
+# Dependencies
+# Note: do NOT commit packages/ or apps/*/node_modules/ if using pnpm
+**/node_modules/
