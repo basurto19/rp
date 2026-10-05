@@ -3,13 +3,28 @@ import { AuthService } from '../services/auth.service';
 import { successResponse, errorResponse } from '../../shared/responses/response-helper';
 import { AppError } from '../../shared/errors/app-error';
 import { validateRequestBody } from '../../shared/validators';
-import { loginSchema, refreshTokenSchema, forgotPasswordSchema, changePasswordSchema } from '@erp/validation';
+import { loginSchema, registerSchema, refreshTokenSchema, forgotPasswordSchema, changePasswordSchema } from '@erp/validation';
 
 export class AuthController {
   private service: AuthService;
 
   constructor() {
     this.service = new AuthService();
+  }
+
+  async register(request: Request, response: Response): Promise<Response> {
+    const validation = validateRequestBody(registerSchema, request.body);
+    if (!validation.valid) {
+      return response.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Error de validación', details: validation.errors } });
+    }
+
+    try {
+      const result = await this.service.register(validation.data);
+      return successResponse(response, result, 201, 'Cuenta creada');
+    } catch (err) {
+      if (err instanceof AppError) return errorResponse(response, err);
+      throw err;
+    }
   }
 
   async login(request: Request, response: Response): Promise<Response> {

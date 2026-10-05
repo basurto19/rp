@@ -51,7 +51,7 @@ ERP-SYSTEM/
 ## Instalación
 
 ### 1. Prerrequisitos
-- Node.js 20+
+- Node.js 24.x
 - pnpm 9+
 - MongoDB Atlas (o MongoDB local)
 

@@ -49,11 +49,14 @@ http://localhost:3000/api/v1
 | Método | Endpoint | Descripción | Auth |
 |--------|----------|-------------|------|
 | POST | `/api/v1/auth/login` | Iniciar sesión | No |
+| POST | `/api/v1/auth/register` | Crear empresa, administrador inicial y sesión | No |
 | POST | `/api/v1/auth/refresh` | Renovar token | No |
 | POST | `/api/v1/auth/logout` | Cerrar sesión | Si |
 | POST | `/api/v1/auth/logout-all` | Cerrar todas las sesiones | Si |
 | POST | `/api/v1/auth/forgot-password` | Solicitar recuperación | No |
 | PUT | `/api/v1/auth/change-password` | Cambiar contraseña | Si |
+
+`/auth/register` recibe `firstName`, `lastName`, `email`, `password` (mínimo 8 caracteres) y `companyName`. El RUC no es necesario para el alta; puede completarse después al actualizar los datos de la empresa. El alta crea un tenant aislado, su empresa y su primer administrador con permisos de los módulos backend disponibles, y devuelve la sesión para ingresar de inmediato.
 
 ## Endpoints de Usuarios
 
@@ -125,3 +128,48 @@ http://localhost:3000/api/v1
 | DUPLICATE_RESOURCE | Recurso duplicado | 409 |
 | DATABASE_ERROR | Error de base de datos | 500 |
 | INTERNAL_SERVER_ERROR | Error interno del servidor | 500 |
+
+## Contrato usado por la web
+
+La aplicación web llama los paths relativos a `/api/v1`. Las respuestas de éxito usan `{ success: true, data, message? }`; errores usan `{ success: false, error: { code, message, details? } }`. Las listas de `users`, `companies`, `branches`, `roles`, `settings` y `audit` contienen dentro de `data` `{ data, total, page, limit, hasMore }` (por defecto página 1 y 20 registros; solo auditoría lee `page` y `limit` de query).
+
+| Método y path | Parámetros/cuerpo | Respuesta de datos | Permiso |
+|---|---|---|---|
+| `POST /auth/login` | `{ email, password }` | Sesión `{ accessToken, refreshToken, user }` | Público |
+| `POST /auth/register` | `{ firstName, lastName, email, password, companyName }` | 201; sesión inicial | Público |
+| `POST /auth/refresh` | `{ refreshToken }` | `{ accessToken }` | Público, validado por refresh token |
+| `POST /auth/logout` | `{ refreshToken }` | `{ success: true }` | Bearer; sesión actual |
+| `POST /auth/logout-all` | sin cuerpo | `{ success: true }` | Bearer; sesión actual |
+| `PUT /auth/change-password` | `{ currentPassword, newPassword, confirmPassword }` | `{ changed: true }` | Bearer; sesión actual |
+| `POST /users` | `{ email, firstName, lastName, password, roleId, branchId? }` | 201; usuario sin hash/tokens | `users:create` |
+| `GET /users`, `GET /users/:id` | `:id` es `_id` Mongo; listado también filtra por sucursal del token | Usuario/listado del tenant | `users:read` |
+| `PUT /users/:id` | campos parciales `firstName`, `lastName`, `roleId`, `branchId`, `status` | Usuario actualizado sin hash/tokens | `users:update` |
+| `DELETE /users/:id` | `:id` es `_id` Mongo | `{ deleted: true }` | `users:delete` |
+| `POST /companies` | `{ name, ruc, email }` | 201; empresa | `companies:create` |
+| `GET /companies`, `GET /companies/:id` | `:id` es `_id` Mongo | Empresa/listado del tenant | `companies:read` |
+| `PUT /companies/:id` | subconjunto de `{ name, ruc, email }` | Empresa actualizada | `companies:update` |
+| `DELETE /companies/:id` | `:id` es `_id` Mongo | `{ deleted: true }` | `companies:delete` |
+| `POST /branches` | `{ branchId: UUID, name, address: { street, city, state, country, zipCode }, phone }` | 201; sucursal | `branches:create` |
+| `GET /branches`, `GET /branches/:id` | `:id` es `_id` Mongo | Sucursal/listado del tenant | `branches:read` |
+| `PUT /branches/:id` | campos parciales de la sucursal | Sucursal actualizada | `branches:update` |
+| `DELETE /branches/:id` | `:id` es `_id` Mongo | `{ deleted: true }` | `branches:delete` |
+| `POST /roles` | `{ roleId, name, description?, permissions, scope? }` | 201; rol | `roles:create` |
+| `GET /roles`, `GET /roles/:id` | `:id` es `_id` Mongo | Rol/listado del tenant | `roles:read` |
+| `PUT /roles/:id` | campos del rol | Rol actualizado | `roles:update` |
+| `DELETE /roles/:id` | `:id` es `_id` Mongo | `{ deleted: true }`; roles `isSystem` se rechazan | `roles:delete` |
+| `GET /settings`, `GET /settings/:key` | `:key` es la clave pública | Configuración/listado del tenant | `settings:read` |
+| `PUT /settings/:key` | `{ value, type?, description? }`; tipo `string`, `number`, `boolean` o `json` | Configuración creada/actualizada (201) | `settings:update` |
+| `DELETE /settings/:key` | `:key` es la clave pública, no `_id` | `{ deleted: true }` | `settings:delete` |
+| `GET /audit?page=&limit=` | opcional; predeterminados 1 y 20 | Página `{ data, total, page, limit, hasMore }` | `audit:read` |
+| `GET /audit/module/:module?page=&limit=` | `:module` y paginación opcional | Página filtrada por módulo y tenant | `audit:read` |
+
+Todos los endpoints de datos pasan por `authenticateToken` y `validateTenant`; el `tenantId` se toma del JWT, nunca del formulario. El frontend oculta acciones sin permiso solo para UX: la API vuelve a validar cada permiso y tenant. El endpoint `GET /health` no requiere token. No existe endpoint de dashboard.
+
+Notas de implementación verificadas:
+- El frontend compila `ERP_API_BASE_URL` en `apps/web` (script de build/dev basado en esbuild); en desarrollo local, si no está definida, usa `http://<host>:3000/api/v1`. En producción configúrala en el entorno de build del Static Site, sin incluir credenciales.
+- El backend debe permitir el origen del Static Site mediante `CORS_ORIGIN`.
+- La respuesta de usuarios excluye `passwordHash`, refresh token y expiración.
+- `/settings` solo tiene GET en la ruta raíz; el `PUT` de upsert requiere `/:key`.
+- El router de roles no aplica un schema Zod server-side; los formularios web validan su estructura localmente, pero el servidor sigue siendo la autoridad de autorización.
+- `/auth/forgot-password` figura como público, pero su controlador necesita tenant y actualmente esa ruta no aplica `validateTenant`; la web no lo integra.
+- Las operaciones CRUD contra una base Atlas real requieren credenciales de entorno y no se simulan como operaciones reales en pruebas locales.

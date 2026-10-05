@@ -10,8 +10,16 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'La contraseña es obligatoria'),
 });
 
+export const registerSchema = z.object({
+  firstName: z.string().trim().min(1, 'El nombre es obligatorio').max(100),
+  lastName: z.string().trim().min(1, 'El apellido es obligatorio').max(100),
+  email: z.string().trim().email('Formato de email inválido').max(254),
+  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres').max(128),
+  companyName: z.string().trim().min(1, 'El nombre de la empresa es obligatorio').max(200),
+});
+
 export const refreshTokenSchema = z.object({
-  refreshToken: z.string().uuid('Token de refresco inválido'),
+  refreshToken: z.string().min(1, 'Token de refresco inválido'),
 });
 
 export const forgotPasswordSchema = z.object({
@@ -31,17 +39,18 @@ export const changePasswordSchema = z.object({
 // User Validators
 // =============================
 export const createUserSchema = z.object({
-  email: z.string().email('Formato de email inválido'),
-  firstName: z.string().min(1).max(100, 'Nombre demasiado largo'),
-  lastName: z.string().min(1).max(100, 'Apellido demasiado largo'),
-  roleId: z.string().uuid('ID de rol inválido'),
+  email: z.string().trim().email('Formato de email inválido').max(254),
+  firstName: z.string().trim().min(1).max(100, 'Nombre demasiado largo'),
+  lastName: z.string().trim().min(1).max(100, 'Apellido demasiado largo'),
+  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres').max(128),
+  roleId: z.string().trim().min(1, 'El rol es obligatorio').max(100),
   branchId: z.string().uuid('ID de sucursal inválido').optional().or(z.literal('')),
 });
 
 export const updateUserSchema = z.object({
   firstName: z.string().min(1).max(100).optional(),
   lastName: z.string().min(1).max(100).optional(),
-  roleId: z.string().uuid().optional(),
+  roleId: z.string().trim().min(1).max(100).optional(),
   branchId: z.string().uuid().optional().or(z.literal('')),
   status: z.enum(['active', 'inactive', 'locked']).optional(),
 });
@@ -61,6 +70,7 @@ export const updateCompanySchema = createCompanySchema.partial();
 // Branch Validators
 // =============================
 export const createBranchSchema = z.object({
+  branchId: z.string().uuid('ID de sucursal inválido'),
   name: z.string().min(1).max(200),
   address: z.object({
     street: z.string(),

@@ -1,5 +1,5 @@
 // apps/api/src/modules/users/models/user.model.ts
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model } from 'mongoose';
 
 export interface IUser {
   tenantId: string;

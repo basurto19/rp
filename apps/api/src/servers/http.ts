@@ -12,7 +12,7 @@ const startServer = async (): Promise<void> => {
   }
 
   const app = createApp();
-  const server = app.listen(env.port, () => {
+  const server = app.listen(env.port, '0.0.0.0', () => {
     console.info(`API server running on port ${env.port} (${env.nodeEnv})`);
     console.info(`Health check: http://localhost:${env.port}/health`);
   });

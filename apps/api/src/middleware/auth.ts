@@ -21,7 +21,7 @@ export function authenticateToken(
   const authHeader = request.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    next(new AppError('UNAUTHORIZED', 'Token de acceso no proporcionado'));
+    next(new AppError('UNAUTHORIZED', 'Token de acceso no proporcionado', 401));
     return;
   }
 
@@ -39,9 +39,9 @@ export function authenticateToken(
     next();
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
-      next(new AppError('TOKEN_EXPIRED', 'Token de acceso expirado'));
+      next(new AppError('TOKEN_EXPIRED', 'Token de acceso expirado', 401));
     } else {
-      next(new AppError('INVALID_TOKEN', 'Token de acceso inválido'));
+      next(new AppError('INVALID_TOKEN', 'Token de acceso inválido', 401));
     }
   }
 }
@@ -54,7 +54,7 @@ export function authenticateRefreshToken(
   const { refreshToken } = request.body;
 
   if (!refreshToken) {
-    next(new AppError('UNAUTHORIZED', 'Token de refresco no proporcionado'));
+    next(new AppError('UNAUTHORIZED', 'Token de refresco no proporcionado', 401));
     return;
   }
 
@@ -67,7 +67,7 @@ export function authenticateRefreshToken(
     (request as TenantAwareRequest).userRole = decoded.roleId;
 
     next();
-  } catch (error) {
-    next(new AppError('INVALID_TOKEN', 'Token de refresco inválido'));
+  } catch {
+    next(new AppError('INVALID_TOKEN', 'Token de refresco inválido', 401));
   }
 }

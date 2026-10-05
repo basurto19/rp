@@ -3,7 +3,6 @@
 import { Role } from '../models/role.model';
 import { BaseRepository } from '../../shared/repositories/base-repository';
 import { AppError } from '../../shared/errors/app-error';
-import { IRole } from '../models/role.model';
 
 export class RoleService {
   private repository: BaseRepository<any>;

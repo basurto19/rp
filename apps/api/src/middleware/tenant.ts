@@ -13,7 +13,9 @@ interface TenantAwareRequest extends Request {
   userPermissions: Array<{ module: string; actions: Record<string, boolean> }>;
 }
 
-function asyncHandler(fn: Function) {
+function asyncHandler(
+  fn: (request: Request, response: Response, next: NextFunction) => Promise<void>,
+) {
   return (request: Request, response: Response, next: NextFunction) => {
     Promise.resolve(fn(request, response, next)).catch(next);
   };
@@ -23,28 +25,28 @@ export const validateTenant = asyncHandler(async (request: Request, _response: R
   const tenantAwareRequest = request as TenantAwareRequest;
 
   if (!tenantAwareRequest.tenantId) {
-    next(new AppError('UNAUTHORIZED', 'Tenant no identificado'));
+    next(new AppError('UNAUTHORIZED', 'Tenant no identificado', 401));
     return;
   }
 
   if (typeof tenantAwareRequest.tenantId !== 'string') {
-    next(new AppError('INVALID_TOKEN', 'Tenant inválido'));
+    next(new AppError('INVALID_TOKEN', 'Tenant inválido', 401));
     return;
   }
 
   try {
     const company = await Company.findOne({ tenantId: tenantAwareRequest.tenantId }).exec();
     if (!company) {
-      next(new AppError('UNAUTHORIZED', 'Empresa no encontrada'));
+      next(new AppError('UNAUTHORIZED', 'Empresa no encontrada', 401));
       return;
     }
     if (company.status === 'inactive') {
-      next(new AppError('FORBIDDEN', 'La empresa está inactiva'));
+      next(new AppError('FORBIDDEN', 'La empresa está inactiva', 403));
       return;
     }
     next();
-  } catch (error) {
-    next(new AppError('DATABASE_ERROR', 'Error al validar la empresa'));
+  } catch {
+    next(new AppError('DATABASE_ERROR', 'Error al validar la empresa', 500));
   }
 });
 
@@ -63,7 +65,7 @@ export function authorizeRole(
     });
 
     if (!hasPermission) {
-      next(new AppError('FORBIDDEN', 'No tienes permisos para esta acción'));
+      next(new AppError('FORBIDDEN', 'No tienes permisos para esta acción', 403));
       return;
     }
 

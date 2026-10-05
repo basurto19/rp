@@ -1,10 +1,10 @@
 // apps/api/src/modules/companies/models/company.model.ts
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model } from 'mongoose';
 
 export interface ICompany {
   tenantId: string;
   name: string;
-  ruc: string;
+  ruc?: string;
   email: string;
   logo?: string;
   settings?: Record<string, unknown>;
@@ -15,7 +15,7 @@ export interface ICompany {
 const companySchema = new Schema<ICompany>({
   tenantId: { type: String, required: true, index: true },
   name: { type: String, required: true, maxlength: 200 },
-  ruc: { type: String, required: true, maxlength: 20 },
+  ruc: { type: String, required: false, maxlength: 20 },
   email: { type: String, required: true },
   logo: { type: String },
   settings: { type: Schema.Types.Mixed },

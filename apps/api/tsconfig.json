@@ -6,15 +6,11 @@
     "baseUrl": ".",
     "noImplicitAny": false,
     "paths": {
-      "@erp/shared-types": ["../../packages/shared-types/src"],
-      "@erp/validation": ["../../packages/validation/src"],
-      "@erp/constants": ["../../packages/constants/src"],
-      "@erp/utils": ["../../packages/utils/src"],
       "@erp/middleware": ["../../apps/api/src/middleware"]
     },
     "typeRoots": ["./node_modules/@types"],
     "noEmitOnError": false
   },
-  "include": ["src/**/*.ts", "../../packages/**/*.ts"],
+  "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "tests"]
 }

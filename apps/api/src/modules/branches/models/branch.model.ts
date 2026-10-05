@@ -1,5 +1,5 @@
 // apps/api/src/modules/branches/models/branch.model.ts
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model } from 'mongoose';
 
 export interface IBranch {
   tenantId: string;

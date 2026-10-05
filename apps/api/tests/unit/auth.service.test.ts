@@ -6,9 +6,11 @@ import { AppError } from '../../src/modules/shared/errors/app-error';
 
 // Mock del modelo User
 jest.mock('../../src/modules/users/models/user.model', () => ({
-  findOne: jest.fn(),
-  findById: jest.fn(),
-  findByIdAndUpdate: jest.fn(),
+  User: {
+    findOne: jest.fn(),
+    findById: jest.fn(),
+    findByIdAndUpdate: jest.fn(),
+  },
 }));
 
 const mockUser = {
@@ -32,13 +34,15 @@ describe('AuthService', () => {
 
   describe('login', () => {
     it('debería lanzar error si el usuario no existe', async () => {
-      (User.findOne as jest.Mock).mockResolvedValue(null);
+      (User.findOne as jest.Mock).mockReturnValue({ exec: jest.fn().mockResolvedValue(null) });
 
       await expect(authService.login('unknown@test.com', 'password123')).rejects.toThrow(AppError);
     });
 
     it('debería lanzar error si el usuario está bloqueado', async () => {
-      (User.findOne as jest.Mock).mockResolvedValue({ ...mockUser, status: 'locked' });
+      (User.findOne as jest.Mock).mockReturnValue({
+        exec: jest.fn().mockResolvedValue({ ...mockUser, status: 'locked' }),
+      });
 
       await expect(authService.login('locked@test.com', 'password123')).rejects.toThrow(AppError);
     });
@@ -46,7 +50,7 @@ describe('AuthService', () => {
 
   describe('changePassword', () => {
     it('debería lanzar error si el usuario no existe', async () => {
-      (User.findById as jest.Mock).mockResolvedValue(null);
+      (User.findById as jest.Mock).mockReturnValue({ exec: jest.fn().mockResolvedValue(null) });
 
       await expect(authService.changePassword('unknown-id', 'old', 'new123456')).rejects.toThrow(AppError);
     });

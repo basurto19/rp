@@ -5,8 +5,10 @@ import { Company } from '../../src/modules/companies/models/company.model';
 import { AppError } from '../../src/modules/shared/errors/app-error';
 
 jest.mock('../../src/modules/companies/models/company.model', () => ({
-  findOne: jest.fn(),
-  countDocuments: jest.fn(),
+  Company: {
+    findOne: jest.fn(),
+    countDocuments: jest.fn(),
+  },
 }));
 
 describe('CompanyService', () => {
@@ -19,7 +21,9 @@ describe('CompanyService', () => {
 
   describe('create', () => {
     it('debería lanzar error si la empresa ya existe', async () => {
-      (Company.findOne as jest.Mock).mockResolvedValue({ _id: 'existing-id' });
+      (Company.findOne as jest.Mock).mockReturnValue({
+        exec: jest.fn().mockResolvedValue({ _id: 'existing-id' }),
+      });
 
       await expect(companyService.create({
         tenantId: 'test-tenant',

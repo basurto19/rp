@@ -7,13 +7,17 @@
     "dev": "tsx watch src/servers/http.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/servers/http.js",
-    "test": "jest --config jest.config.js",
-    "test:unit": "jest tests/unit --config jest.config.js --verbose",
-    "test:integration": "jest tests/integration --config jest.config.js --verbose",
-    "test:all": "jest --config jest.config.js --verbose",
-    "lint": "eslint src tests"
+    "test": "jest --config ../../jest.config.js",
+    "test:unit": "jest tests/unit --config ../../jest.config.js --verbose",
+    "test:integration": "jest tests/integration --config ../../jest.config.js --verbose",
+    "test:all": "jest --config ../../jest.config.js --verbose",
+    "lint": "eslint src"
   },
   "dependencies": {
+    "@erp/constants": "workspace:^",
+    "@erp/shared-types": "workspace:^",
+    "@erp/utils": "workspace:^",
+    "@erp/validation": "workspace:^",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^16.6.1",

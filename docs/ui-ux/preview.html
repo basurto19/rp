@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>Apta Digital | Panel ERP</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --brand-navy: #022656;
+        --brand-teal: #0090a0;
+        --ink: #20262d;
+        --muted: #66717c;
+        --line: #dfe4e8;
+        --surface: #ffffff;
+        --canvas: #f1f3f4;
+        --warning: #805500;
+        --warning-bg: #fff6df;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: var(--canvas);
+        color: var(--ink);
+        font-family: "Segoe UI", sans-serif;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        padding: 20px clamp(20px, 5vw, 72px);
+        background: var(--brand-navy);
+        color: white;
+      }
+
+      .identity {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 15px;
+        font-weight: 650;
+      }
+
+      .identity-mark {
+        width: 11px;
+        height: 28px;
+        border-radius: 2px;
+        background: var(--brand-teal);
+      }
+
+      header span:last-child {
+        color: #d3dce5;
+        font-size: 13px;
+      }
+
+      main {
+        width: min(1440px, 100%);
+        margin: 0 auto;
+        padding: 38px clamp(16px, 4vw, 56px) 56px;
+      }
+
+      h1 {
+        margin: 0;
+        color: var(--brand-navy);
+        font-size: 28px;
+        font-weight: 650;
+      }
+
+      .intro {
+        margin: 8px 0 28px;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .app-shell {
+        display: grid;
+        min-height: 100vh;
+        grid-template-columns: 252px minmax(0, 1fr);
+      }
+
+      .sidebar {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        padding: 20px 14px 16px;
+        background: #111a23;
+        color: #edf2f5;
+      }
+
+      .brand-lockup {
+        display: flex;
+        min-height: 70px;
+        align-items: center;
+        gap: 12px;
+        padding: 6px 8px 16px;
+        border-bottom: 1px solid #303a44;
+      }
+
+      .brand-lockup img {
+        display: block;
+        width: 42px;
+        height: 52px;
+        flex: 0 0 auto;
+        border-radius: 3px;
+        background: white;
+        object-fit: contain;
+      }
+
+      .brand-name { display: grid; gap: 4px; }
+      .brand-name strong { font-size: 14px; }
+      .brand-name span { color: #aebbc6; font-size: 10px; }
+
+      .sidebar-section { margin-top: 26px; }
+
+      .sidebar-label {
+        margin: 0 10px 9px;
+        color: #91a0ad;
+        font-size: 10px;
+        font-weight: 700;
+      }
+
+      .nav-list { display: grid; gap: 3px; }
+
+      .nav-item {
+        display: flex;
+        width: 100%;
+        min-height: 40px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 0 11px;
+        border: 0;
+        border-radius: 4px;
+        background: transparent;
+        color: #d5dde3;
+        font: inherit;
+        font-size: 13px;
+        text-align: left;
+      }
+
+      .nav-item.active {
+        background: #263947;
+        color: white;
+        box-shadow: inset 3px 0 var(--brand-teal);
+      }
+
+      .nav-item:disabled { opacity: 1; }
+
+      .nav-meta {
+        color: #aab8c2;
+        font-size: 10px;
+      }
+
+      .nav-item.active .nav-meta { color: #8bd4d7; }
+
+      .sidebar-foot {
+        margin-top: auto;
+        padding: 14px 10px 3px;
+        border-top: 1px solid #303a44;
+        color: #aebbc6;
+        font-size: 11px;
+        line-height: 1.5;
+      }
+
+      .workspace { min-width: 0; }
+
+      header.topbar {
+        min-height: 66px;
+        padding: 12px clamp(18px, 3vw, 40px);
+        border-bottom: 1px solid var(--line);
+        background: white;
+        color: var(--ink);
+      }
+
+      .breadcrumb {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .topbar-state {
+        padding: 6px 9px;
+        border: 1px solid #d6e5e5;
+        border-radius: 3px;
+        background: #f0f8f8;
+        color: #126b70;
+        font-size: 11px;
+      }
+
+      main.workspace-main {
+        width: min(1480px, 100%);
+        margin: 0 auto;
+        padding: 30px clamp(18px, 3vw, 40px) 48px;
+      }
+
+      .page-heading {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 20px;
+        margin-bottom: 22px;
+      }
+
+      .eyebrow {
+        margin: 0 0 7px;
+        color: var(--brand-teal);
+        font-size: 10px;
+        font-weight: 750;
+      }
+
+      .page-heading .intro { margin-bottom: 0; }
+
+      .preview-tag {
+        flex: 0 0 auto;
+        padding: 7px 9px;
+        border: 1px solid #d9dfe3;
+        border-radius: 3px;
+        background: #fff;
+        color: #52616c;
+        font-size: 11px;
+      }
+
+      .data-note {
+        display: flex;
+        align-items: flex-start;
+        gap: 11px;
+        margin-bottom: 18px;
+        padding: 13px 15px;
+        border: 1px solid #d9e6e9;
+        border-left: 3px solid var(--brand-teal);
+        background: #f7fbfb;
+        color: #35454e;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .data-note strong { display: block; color: var(--brand-navy); }
+      .data-note span { color: var(--muted); }
+
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 13px;
+        margin-bottom: 16px;
+      }
+
+      .kpi {
+        min-width: 0;
+        padding: 17px 18px 15px;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        background: white;
+      }
+
+      .kpi-label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        color: #53616b;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .kpi-value {
+        margin: 15px 0 9px;
+        color: var(--brand-navy);
+        font-size: 29px;
+        font-weight: 650;
+        line-height: 1;
+      }
+
+      .kpi-foot { color: #79858d; font-size: 10px; }
+
+      .dashboard-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.45fr) minmax(270px, 0.85fr);
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+
+      .panel {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        background: white;
+      }
+
+      .panel-heading {
+        display: flex;
+        min-height: 57px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 13px 17px;
+        border-bottom: 1px solid #e9edef;
+      }
+
+      .panel-heading h2 {
+        margin: 0;
+        color: #26333c;
+        font-size: 14px;
+        font-weight: 650;
+      }
+
+      .panel-heading span { color: var(--muted); font-size: 11px; }
+
+      .empty-state {
+        display: grid;
+        min-height: 170px;
+        align-content: center;
+        justify-items: center;
+        gap: 7px;
+        padding: 24px;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      .empty-mark {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        margin-bottom: 3px;
+        border: 1px solid #d9e6e9;
+        border-radius: 50%;
+        color: var(--brand-teal);
+        font-size: 16px;
+      }
+
+      .empty-state strong { color: #3c4850; font-size: 13px; }
+      .empty-state span { max-width: 40ch; font-size: 11px; line-height: 1.5; }
+
+      .module-list { padding: 5px 16px; }
+
+      .module-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 42px;
+        border-bottom: 1px solid #edf0f2;
+        font-size: 12px;
+      }
+
+      .module-row:last-child { border-bottom: 0; }
+      .module-row strong { color: #34414a; font-weight: 550; }
+
+      .status-pending {
+        flex: 0 0 auto;
+        color: #727e87;
+        font-size: 10px;
+      }
+
+      .table-wrap { overflow-x: auto; }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+        text-align: left;
+      }
+
+      th, td { padding: 12px 17px; border-bottom: 1px solid #edf0f2; }
+      th { color: #68757e; font-size: 10px; font-weight: 700; }
+      td { color: #34414a; }
+      tr:last-child td { border-bottom: 0; }
+      td code { color: #596872; font-size: 11px; }
+
+      .api-badge {
+        display: inline-flex;
+        padding: 4px 7px;
+        border: 1px solid #d7e8e6;
+        border-radius: 3px;
+        background: #f1f8f7;
+        color: #236d69;
+        font-size: 10px;
+        white-space: nowrap;
+      }
+
+      @media (max-width: 1050px) {
+        .app-shell { grid-template-columns: 218px minmax(0, 1fr); }
+        .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+
+      @media (max-width: 760px) {
+        .app-shell { grid-template-columns: minmax(0, 1fr); }
+        .sidebar { padding: 12px 14px; }
+        .brand-lockup { min-height: 56px; padding: 0 4px 10px; }
+        .brand-lockup img { width: 34px; height: 42px; }
+        .sidebar-section { margin-top: 12px; }
+        .sidebar-label { margin: 0 4px 7px; }
+        .nav-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .nav-item { min-height: 36px; gap: 5px; padding: 0 7px; font-size: 11px; }
+        .nav-meta { font-size: 9px; }
+        .sidebar-foot { display: none; }
+        header.topbar { min-height: 54px; }
+        main.workspace-main { padding-top: 24px; }
+        .dashboard-grid { grid-template-columns: minmax(0, 1fr); }
+      }
+
+      @media (max-width: 480px) {
+        .nav-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .page-heading { align-items: flex-start; flex-direction: column; gap: 10px; }
+        .page-heading h1 { font-size: 24px; }
+        .preview-tag { align-self: flex-start; }
+        .kpi-grid { gap: 9px; }
+        .kpi { padding: 13px; }
+        .kpi-value { font-size: 25px; }
+        th, td { padding: 10px 12px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand-lockup">
+          <img src="../../apps/web/public/assets/brand/apta-digital-logo.jpg" alt="Logo de Apta Digital">
+          <div class="brand-name"><strong>Apta Digital</strong><span>GESTIÓN EMPRESARIAL</span></div>
+        </div>
+        <nav aria-label="Navegación ERP">
+          <section class="sidebar-section">
+            <p class="sidebar-label">GENERAL</p>
+            <div class="nav-list">
+              <a class="nav-item active" href="#dashboard" aria-current="page"><span>Panel de control</span><span class="nav-meta">Inicio</span></a>
+            </div>
+          </section>
+          <section class="sidebar-section">
+            <p class="sidebar-label">ADMINISTRACIÓN</p>
+            <div class="nav-list">
+              <button class="nav-item" type="button" disabled><span>Usuarios</span><span class="nav-meta">API</span></button>
+              <button class="nav-item" type="button" disabled><span>Empresas</span><span class="nav-meta">API</span></button>
+              <button class="nav-item" type="button" disabled><span>Sucursales</span><span class="nav-meta">API</span></button>
+              <button class="nav-item" type="button" disabled><span>Roles</span><span class="nav-meta">API</span></button>
+            </div>
+          </section>
+          <section class="sidebar-section">
+            <p class="sidebar-label">CONTROL</p>
+            <div class="nav-list">
+              <button class="nav-item" type="button" disabled><span>Auditoría</span><span class="nav-meta">API</span></button>
+              <button class="nav-item" type="button" disabled><span>Configuración</span><span class="nav-meta">API</span></button>
+            </div>
+          </section>
+        </nav>
+        <div class="sidebar-foot">Módulos API disponibles<br>Interfaz operativa pendiente</div>
+      </aside>
+
+      <div class="workspace">
+        <header class="topbar">
+          <span class="breadcrumb">Apta Digital <span aria-hidden="true">/</span> Panel</span>
+          <span class="topbar-state">Sin sesión conectada</span>
+        </header>
+
+        <main class="workspace-main" id="dashboard">
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">GENERAL / RESUMEN</p>
+              <h1>Panel de control</h1>
+              <p class="intro">Estado de los módulos empresariales disponibles.</p>
+            </div>
+            <span class="preview-tag">Vista de diseño · sin datos operativos</span>
+          </div>
+
+          <div class="data-note" role="status">
+            <div><strong>Indicadores todavía no conectados</strong><span>No hay endpoint de dashboard en la API; las cifras se muestran vacías hasta integrar fuentes reales.</span></div>
+          </div>
+
+          <section class="kpi-grid" aria-label="Indicadores del sistema">
+            <article class="kpi"><div class="kpi-label"><span>Usuarios</span><span class="api-badge">API disponible</span></div><div class="kpi-value">—</div><div class="kpi-foot">GET /api/v1/users · pendiente de conexión</div></article>
+            <article class="kpi"><div class="kpi-label"><span>Empresas</span><span class="api-badge">API disponible</span></div><div class="kpi-value">—</div><div class="kpi-foot">GET /api/v1/companies · pendiente de conexión</div></article>
+            <article class="kpi"><div class="kpi-label"><span>Sucursales</span><span class="api-badge">API disponible</span></div><div class="kpi-value">—</div><div class="kpi-foot">GET /api/v1/branches · pendiente de conexión</div></article>
+            <article class="kpi"><div class="kpi-label"><span>Roles</span><span class="api-badge">API disponible</span></div><div class="kpi-value">—</div><div class="kpi-foot">GET /api/v1/roles · pendiente de conexión</div></article>
+          </section>
+
+          <div class="dashboard-grid">
+            <section class="panel" aria-labelledby="activity-title">
+              <div class="panel-heading"><h2 id="activity-title">Actividad reciente</h2><span>Auditoría</span></div>
+              <div class="empty-state"><div class="empty-mark" aria-hidden="true">·</div><strong>No hay actividad cargada</strong><span>Los eventos reales aparecerán al conectar el módulo de auditoría.</span></div>
+            </section>
+            <section class="panel" aria-labelledby="modules-title">
+              <div class="panel-heading"><h2 id="modules-title">Módulos disponibles</h2><span>Backend</span></div>
+              <div class="module-list">
+                <div class="module-row"><strong>Usuarios</strong><span class="status-pending">Interfaz pendiente</span></div>
+                <div class="module-row"><strong>Empresas</strong><span class="status-pending">Interfaz pendiente</span></div>
+                <div class="module-row"><strong>Sucursales</strong><span class="status-pending">Interfaz pendiente</span></div>
+                <div class="module-row"><strong>Roles</strong><span class="status-pending">Interfaz pendiente</span></div>
+                <div class="module-row"><strong>Auditoría</strong><span class="status-pending">Interfaz pendiente</span></div>
+                <div class="module-row"><strong>Configuración</strong><span class="status-pending">Interfaz pendiente</span></div>
+              </div>
+            </section>
+          </div>
+
+          <section class="panel" aria-labelledby="api-title">
+            <div class="panel-heading"><h2 id="api-title">Cobertura de módulos</h2><span>Rutas registradas en la API</span></div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th scope="col">MÓDULO</th><th scope="col">RECURSO API</th><th scope="col">ESTADO FRONTEND</th></tr></thead>
+                <tbody>
+                  <tr><td>Usuarios</td><td><code>/api/v1/users</code></td><td><span class="status-pending">Pendiente</span></td></tr>
+                  <tr><td>Empresas</td><td><code>/api/v1/companies</code></td><td><span class="status-pending">Pendiente</span></td></tr>
+                  <tr><td>Sucursales</td><td><code>/api/v1/branches</code></td><td><span class="status-pending">Pendiente</span></td></tr>
+                  <tr><td>Roles</td><td><code>/api/v1/roles</code></td><td><span class="status-pending">Pendiente</span></td></tr>
+                  <tr><td>Auditoría</td><td><code>/api/v1/audit</code></td><td><span class="status-pending">Pendiente</span></td></tr>
+                  <tr><td>Configuración</td><td><code>/api/v1/settings</code></td><td><span class="status-pending">Pendiente</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

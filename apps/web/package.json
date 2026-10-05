@@ -4,17 +4,20 @@
   "private": true,
   "main": "src/index.ts",
   "scripts": {
-    "dev": "echo 'Web app - React Native Web'",
-    "build": "echo 'Build web app'"
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@erp/validation": "workspace:^",
+    "axios": "^1.6.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-native-web": "^0.19.0",
-    "zustand": "^4.5.0",
-    "axios": "^1.6.0"
+    "zustand": "^4.5.0"
   },
   "devDependencies": {
-    "@types/react": "^18.2.0"
+    "@types/react": "^18.2.0",
+    "esbuild": "^0.28.2"
   }
 }

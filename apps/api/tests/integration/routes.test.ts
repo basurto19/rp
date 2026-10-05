@@ -42,4 +42,13 @@ describe('API Routes', () => {
       expect(response.body.error.code).toBe('UNAUTHORIZED');
     });
   });
+
+  describe('Protected session routes', () => {
+    it('POST /api/v1/auth/logout requiere autenticación', async () => {
+      await request(app)
+        .post('/api/v1/auth/logout')
+        .send({ refreshToken: 'not-a-real-token' })
+        .expect(401);
+    });
+  });
 });

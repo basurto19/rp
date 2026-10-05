@@ -1,6 +1,6 @@
 // apps/api/src/modules/shared/repositories/base-repository.ts
 
-import { Model, Document, Types } from 'mongoose';
+import { Model, Document } from 'mongoose';
 
 export interface FilterQuery {
   [key: string]: unknown;

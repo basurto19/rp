@@ -2,7 +2,6 @@
 import { User } from '../models/user.model';
 import { BaseRepository } from '../../shared/repositories/base-repository';
 import { AppError } from '../../shared/errors/app-error';
-import { IUser } from '../models/user.model';
 
 export class UserService {
   private repository: BaseRepository<any>;

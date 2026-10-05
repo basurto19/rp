@@ -1,9 +1,10 @@
-require('dotenv').config({
-  path: require('node:path').resolve(__dirname, '../../../../.env'),
-});
-require('node:dns').setServers(['8.8.8.8', '8.8.4.4']);
+import dotenv from 'dotenv';
+import dns from 'node:dns';
+import path from 'node:path';
+import mongoose from 'mongoose';
 
-const mongoose = require('mongoose') as typeof import('mongoose');
+dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
+dns.setServers(['8.8.8.8', '8.8.4.4']);
 
 export const connectDB = async (): Promise<void> => {
   try {

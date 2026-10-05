@@ -4,13 +4,15 @@ import { Request, Response, NextFunction } from 'express';
 import { AuditLogEntry } from '@erp/shared-types';
 import { generateId } from '@erp/utils';
 
-function asyncHandler(fn: Function) {
+function asyncHandler(
+  fn: (request: Request, response: Response, next: NextFunction) => Promise<void>,
+) {
   return (request: Request, response: Response, next: NextFunction) => {
     Promise.resolve(fn(request, response, next)).catch(next);
   };
 }
 
-let auditQueue: AuditLogEntry[] = [];
+const auditQueue: AuditLogEntry[] = [];
 const AUDIT_BATCH_SIZE = 10;
 const AUDIT_FLUSH_INTERVAL_MS = 5000;
 
@@ -20,7 +22,7 @@ function flushAuditQueue(): void {
   console.info(`[AUDIT] Flushing ${batch.length} audit entries`, batch);
 }
 
-setInterval(flushAuditQueue, AUDIT_FLUSH_INTERVAL_MS);
+setInterval(flushAuditQueue, AUDIT_FLUSH_INTERVAL_MS).unref();
 
 export function auditMiddleware(action: string, module: string) {
   return asyncHandler(async (request: Request, _response: Response, next: NextFunction): Promise<void> => {

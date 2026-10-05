@@ -28,3 +28,16 @@ __pycache__/
 # Dependencies
 # Note: do NOT commit packages/ or apps/*/node_modules/ if using pnpm
 **/node_modules/
+apps/web/public/assets/build/
+
+# Android local state and generated artifacts
+apps/mobile/android/.gradle/
+apps/mobile/android/**/.gradle/
+apps/mobile/android/**/build/
+apps/mobile/android/local.properties
+apps/mobile/android/**/*.apk
+apps/mobile/android/**/*.aab
+apps/mobile/android/**/*.jks
+apps/mobile/android/**/*.keystore
+apps/mobile/android/**/*.p12
+apps/mobile/android/**/*.key

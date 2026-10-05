@@ -32,7 +32,10 @@ export class SettingService {
   }
 
   async delete(key: string, tenantId: string) {
-    const deleted = await this.repository.deleteById(key, tenantId);
+    const setting = await this.repository.findOne({ key, tenantId } as any);
+    if (!setting) throw new AppError('RESOURCE_NOT_FOUND', 'Configuración no encontrada', 404);
+
+    const deleted = await this.repository.deleteById(setting._id.toString(), tenantId);
     if (!deleted) throw new AppError('RESOURCE_NOT_FOUND', 'Configuración no encontrada', 404);
     return { deleted: true };
   }

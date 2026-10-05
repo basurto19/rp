@@ -2,7 +2,6 @@
 import { Branch } from '../models/branch.model';
 import { BaseRepository } from '../../shared/repositories/base-repository';
 import { AppError } from '../../shared/errors/app-error';
-import { IBranch } from '../models/branch.model';
 
 export class BranchService {
   private repository: BaseRepository<any>;

@@ -1,7 +1,6 @@
 // apps/api/src/modules/audit/services/audit.service.ts
 
 import { AuditLog } from '../models/audit-log.model';
-import { AuditLogEntry } from '@erp/shared-types';
 import { generateId } from '../../shared/utils';
 
 export class AuditService {

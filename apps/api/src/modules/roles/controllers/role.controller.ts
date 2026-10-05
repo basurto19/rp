@@ -2,8 +2,6 @@ import { Request, Response } from 'express';
 import { RoleService } from '../services/role.service';
 import { successResponse, errorResponse } from '../../shared/responses/response-helper';
 import { AppError } from '../../shared/errors/app-error';
-import { validateRequestBody } from '../../shared/validators';
-import { createCompanySchema, updateCompanySchema } from '@erp/validation';
 
 export class RoleController {
   private service: RoleService;

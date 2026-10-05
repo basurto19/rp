@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador Móvil — GB ERP Android</title>
+  <style>
+    :root {
+      --gb-navy: #022656;
+      --gb-teal: #0090A0;
+      --gb-navy-dark: #01193B;
+      --gb-bg: #F1F5F9;
+      --gb-surface: #FFFFFF;
+      --gb-text-primary: #0F172A;
+      --gb-text-secondary: #475569;
+      --gb-border: #E2E8F0;
+      --gb-success-bg: #D1FAE5;
+      --gb-success-text: #059669;
+      --gb-error: #EF4444;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+    body {
+      background: #0F172A;
+      color: #F8FAFC;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+
+    header.simulator-header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    header.simulator-header h1 {
+      font-size: 24px;
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    header.simulator-header h1 span {
+      background: var(--gb-teal);
+      color: #FFF;
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    header.simulator-header p {
+      color: #94A3B8;
+      font-size: 14px;
+      margin-top: 4px;
+    }
+
+    .controls-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .controls-bar button {
+      background: #1E293B;
+      color: #94A3B8;
+      border: 1px solid #334155;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .controls-bar button:hover, .controls-bar button.active {
+      background: var(--gb-teal);
+      color: #FFFFFF;
+      border-color: var(--gb-teal);
+    }
+
+    /* Smartphone Frame */
+    .phone-container {
+      width: 375px;
+      height: 760px;
+      background: #000;
+      border-radius: 48px;
+      padding: 12px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 0 12px #1E293B;
+      position: relative;
+    }
+
+    /* Punch hole camera */
+    .phone-notch {
+      width: 120px;
+      height: 24px;
+      background: #000;
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-bottom-left-radius: 16px;
+      border-bottom-right-radius: 16px;
+      z-index: 100;
+    }
+
+    /* Screen viewport */
+    .phone-screen {
+      width: 100%;
+      height: 100%;
+      background: var(--gb-bg);
+      border-radius: 36px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* Status Bar */
+    .status-bar {
+      height: 38px;
+      background: var(--gb-navy);
+      color: #FFF;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 20px 0;
+      font-size: 11px;
+      font-weight: 600;
+      z-index: 90;
+    }
+
+    /* App Header */
+    .app-topbar {
+      height: 56px;
+      background: var(--gb-navy);
+      color: #FFF;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .app-topbar h2 {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .app-topbar .subtitle {
+      font-size: 11px;
+      color: var(--gb-teal);
+    }
+
+    .screen-content {
+      flex: 1;
+      overflow-y: auto;
+      display: none;
+      padding: 16px;
+    }
+
+    .screen-content.active {
+      display: block;
+    }
+
+    /* LOGIN SCREEN */
+    #screen-login {
+      background: var(--gb-navy);
+      padding: 24px 16px;
+      text-align: center;
+    }
+
+    .brand-hero {
+      margin-top: 40px;
+      margin-bottom: 32px;
+    }
+
+    .brand-hero h1 {
+      font-size: 38px;
+      font-weight: 800;
+      color: #FFF;
+      letter-spacing: -1px;
+    }
+
+    .brand-hero p {
+      color: var(--gb-teal);
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .card-box {
+      background: var(--gb-surface);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+      margin-bottom: 12px;
+      text-align: left;
+    }
+
+    .card-box h3 {
+      font-size: 16px;
+      color: var(--gb-navy-dark);
+      margin-bottom: 16px;
+      text-align: center;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--gb-text-secondary);
+      margin-bottom: 4px;
+    }
+
+    .form-group input {
+      width: 100%;
+      height: 42px;
+      border: 1px solid var(--gb-border);
+      border-radius: 8px;
+      padding: 0 12px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .btn-primary {
+      width: 100%;
+      height: 44px;
+      background: var(--gb-navy);
+      color: #FFF;
+      border: none;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+
+    /* KPI CARDS */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .kpi-card {
+      background: var(--gb-surface);
+      border-radius: 12px;
+      padding: 14px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .kpi-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: rgba(2, 38, 86, 0.1);
+      color: var(--gb-navy);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .kpi-val {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--gb-navy);
+    }
+
+    .kpi-lbl {
+      font-size: 11px;
+      color: var(--gb-text-secondary);
+    }
+
+    /* LIST ITEMS */
+    .list-item {
+      background: var(--gb-surface);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .list-item .title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--gb-navy);
+    }
+
+    .list-item .desc {
+      font-size: 12px;
+      color: var(--gb-text-secondary);
+      margin-top: 2px;
+    }
+
+    .badge {
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .badge-active { background: var(--gb-success-bg); color: var(--gb-success-text); }
+
+    /* Bottom Navigation Bar */
+    .bottom-nav {
+      height: 60px;
+      background: var(--gb-surface);
+      border-top: 1px solid var(--gb-border);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+    }
+
+    .nav-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      color: var(--gb-text-secondary);
+      font-size: 10px;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      background: none;
+    }
+
+    .nav-btn.active { color: var(--gb-navy); font-weight: 700; }
+    .nav-btn .icon { font-size: 18px; }
+  </style>
+</head>
+<body>
+
+  <header class="simulator-header">
+    <h1>GB ERP Android <span>SIMULADOR NATIVO</span></h1>
+    <p>Vista previa interactiva del cliente móvil Android conectado al servidor GB ERP</p>
+  </header>
+
+  <div class="controls-bar">
+    <button class="active" onclick="switchScreen('login', this)">1. Login</button>
+    <button onclick="switchScreen('dashboard', this)">2. Dashboard</button>
+    <button onclick="switchScreen('companies', this)">3. Empresas</button>
+    <button onclick="switchScreen('users', this)">4. Usuarios</button>
+    <button onclick="switchScreen('audit', this)">5. Auditoría</button>
+    <button onclick="switchScreen('profile', this)">6. Mi Perfil</button>
+  </div>
+
+  <div class="phone-container">
+    <div class="phone-notch"></div>
+    <div class="phone-screen">
+
+      <!-- Status Bar -->
+      <div class="status-bar">
+        <span>09:41</span>
+        <span>5G LTE 100%</span>
+      </div>
+
+      <!-- App Header -->
+      <div class="app-topbar" id="app-topbar">
+        <div>
+          <h2 id="topbar-title">GB ERP Dashboard</h2>
+          <div class="subtitle" id="topbar-sub">Admin GB ERP</div>
+        </div>
+        <div style="font-size: 20px;">👤</div>
+      </div>
+
+      <!-- 1. LOGIN SCREEN -->
+      <div class="screen-content active" id="screen-login">
+        <div class="brand-hero">
+          <h1>GB ERP</h1>
+          <p>Sistema ERP Modular Empresarial</p>
+        </div>
+
+        <div class="card-box">
+          <h3>Iniciar Sesión</h3>
+          <div class="form-group">
+            <label>Correo Electrónico</label>
+            <input type="email" value="admin@gberp.com">
+          </div>
+          <div class="form-group">
+            <label>Contraseña</label>
+            <input type="password" value="••••••••">
+          </div>
+          <button class="btn-primary" onclick="switchScreen('dashboard', document.querySelectorAll('.controls-bar button')[1])">Ingresar</button>
+        </div>
+      </div>
+
+      <!-- 2. DASHBOARD SCREEN -->
+      <div class="screen-content" id="screen-dashboard">
+        <h4 style="font-size: 14px; margin-bottom: 10px; color: var(--gb-navy);">Métricas Principales</h4>
+        <div class="kpi-grid">
+          <div class="kpi-card" onclick="switchScreen('companies', document.querySelectorAll('.controls-bar button')[2])">
+            <div class="kpi-icon">🏢</div>
+            <div>
+              <div class="kpi-val">12</div>
+              <div class="kpi-lbl">Empresas</div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon">🏬</div>
+            <div>
+              <div class="kpi-val">28</div>
+              <div class="kpi-lbl">Sucursales</div>
+            </div>
+          </div>
+          <div class="kpi-card" onclick="switchScreen('users', document.querySelectorAll('.controls-bar button')[3])">
+            <div class="kpi-icon">👥</div>
+            <div>
+              <div class="kpi-val">45</div>
+              <div class="kpi-lbl">Usuarios</div>
+            </div>
+          </div>
+          <div class="kpi-card" onclick="switchScreen('audit', document.querySelectorAll('.controls-bar button')[4])">
+            <div class="kpi-icon">📋</div>
+            <div>
+              <div class="kpi-val">1.2k</div>
+              <div class="kpi-lbl">Auditoría</div>
+            </div>
+          </div>
+        </div>
+
+        <h4 style="font-size: 14px; margin-bottom: 10px; color: var(--gb-navy);">Actividad Reciente del Sistema</h4>
+        <div class="list-item">
+          <div>
+            <div class="title">[AUTH] LOGIN_SUCCESS</div>
+            <div class="desc">Inicio de sesión exitoso desde Android App</div>
+          </div>
+          <span class="badge badge-active">HOY</span>
+        </div>
+        <div class="list-item">
+          <div>
+            <div class="title">[USERS] USER_CREATED</div>
+            <div class="desc">Nuevo usuario registrado en el tenant</div>
+          </div>
+          <span class="badge badge-active">HOY</span>
+        </div>
+      </div>
+
+      <!-- 3. COMPANIES SCREEN -->
+      <div class="screen-content" id="screen-companies">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h4 style="font-size: 14px; color: var(--gb-navy);">Empresas Registradas</h4>
+          <button style="background: var(--gb-navy); color: #FFF; border: none; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700;">+ Nueva</button>
+        </div>
+
+        <div class="list-item">
+          <div>
+            <div class="title">Corporación GB S.A.</div>
+            <div class="desc">RUC: 20601234567 | Principal</div>
+          </div>
+          <span class="badge badge-active">ACTIVA</span>
+        </div>
+        <div class="list-item">
+          <div>
+            <div class="title">GB Logística & Distribución</div>
+            <div class="desc">RUC: 20609876543 | Sucursal</div>
+          </div>
+          <span class="badge badge-active">ACTIVA</span>
+        </div>
+        <div class="list-item">
+          <div>
+            <div class="title">GB Servicios Financieros</div>
+            <div class="desc">RUC: 20601122334 | Finanzas</div>
+          </div>
+          <span class="badge badge-active">ACTIVA</span>
+        </div>
+      </div>
+
+      <!-- 4. USERS SCREEN -->
+      <div class="screen-content" id="screen-users">
+        <div class="form-group" style="margin-bottom: 10px;">
+          <input type="text" placeholder="🔍 Buscar por usuario o email...">
+        </div>
+
+        <div class="list-item">
+          <div>
+            <div class="title">Carlos Basurto</div>
+            <div class="desc">carlos@gberp.com | Admin</div>
+          </div>
+          <span class="badge badge-active">ACTIVO</span>
+        </div>
+        <div class="list-item">
+          <div>
+            <div class="title">María González</div>
+            <div class="desc">maria@gberp.com | Finanzas</div>
+          </div>
+          <span class="badge badge-active">ACTIVO</span>
+        </div>
+        <div class="list-item">
+          <div>
+            <div class="title">Jorge Ramírez</div>
+            <div class="desc">jorge@gberp.com | Almacén</div>
+          </div>
+          <span class="badge badge-active">ACTIVO</span>
+        </div>
+      </div>
+
+      <!-- 5. AUDIT SCREEN -->
+      <div class="screen-content" id="screen-audit">
+        <h4 style="font-size: 14px; margin-bottom: 10px; color: var(--gb-navy);">Logs de Auditoría</h4>
+
+        <div class="list-item">
+          <div>
+            <div class="title">[AUTH] POST /api/v1/auth/login</div>
+            <div class="desc">IP: 192.168.1.50 | 2026-09-28 09:40</div>
+          </div>
+        </div>
+        <div class="list-item">
+          <div>
+            <div class="title">[COMPANIES] POST /api/v1/companies</div>
+            <div class="desc">IP: 192.168.1.50 | 2026-09-28 09:12</div>
+          </div>
+        </div>
+        <div class="list-item">
+          <div>
+            <div class="title">[SETTINGS] PUT /api/v1/settings</div>
+            <div class="desc">IP: 192.168.1.50 | 2026-09-28 08:30</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. PROFILE SCREEN -->
+      <div class="screen-content" id="screen-profile">
+        <div class="card-box" style="text-align: center;">
+          <div style="font-size: 42px; margin-bottom: 8px;">👤</div>
+          <h3 style="margin-bottom: 2px;">Carlos Basurto</h3>
+          <p style="color: var(--gb-text-secondary); font-size: 12px;">carlos@gberp.com</p>
+        </div>
+
+        <div class="card-box">
+          <h4 style="font-size: 13px; color: var(--gb-navy); margin-bottom: 10px;">Cambiar Contraseña</h4>
+          <div class="form-group">
+            <label>Contraseña Actual</label>
+            <input type="password" value="••••••••">
+          </div>
+          <div class="form-group">
+            <label>Nueva Contraseña</label>
+            <input type="password" placeholder="Nueva contraseña">
+          </div>
+          <button class="btn-primary">Actualizar</button>
+        </div>
+
+        <button class="btn-primary" style="background: var(--gb-error);" onclick="switchScreen('login', document.querySelectorAll('.controls-bar button')[0])">Cerrar Sesión</button>
+      </div>
+
+      <!-- Bottom Nav -->
+      <div class="bottom-nav">
+        <button class="nav-btn active" onclick="switchScreen('dashboard', this)">
+          <span class="icon">📊</span>
+          <span>Inicio</span>
+        </button>
+        <button class="nav-btn" onclick="switchScreen('companies', this)">
+          <span class="icon">🏢</span>
+          <span>Empresas</span>
+        </button>
+        <button class="nav-btn" onclick="switchScreen('users', this)">
+          <span class="icon">👥</span>
+          <span>Usuarios</span>
+        </button>
+        <button class="nav-btn" onclick="switchScreen('profile', this)">
+          <span class="icon">👤</span>
+          <span>Perfil</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    function switchScreen(screenId, btn) {
+      document.querySelectorAll('.screen-content').forEach(s => s.classList.remove('active'));
+      document.getElementById('screen-' + screenId).classList.add('active');
+
+      document.querySelectorAll('.controls-bar button').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+
+      const topbar = document.getElementById('app-topbar');
+      const title = document.getElementById('topbar-title');
+
+      if (screenId === 'login') {
+        topbar.style.display = 'none';
+      } else {
+        topbar.style.display = 'flex';
+        if (screenId === 'dashboard') title.textContent = 'GB ERP Dashboard';
+        if (screenId === 'companies') title.textContent = 'Gestión de Empresas';
+        if (screenId === 'users') title.textContent = 'Gestión de Usuarios';
+        if (screenId === 'audit') title.textContent = 'Logs de Auditoría';
+        if (screenId === 'profile') title.textContent = 'Mi Perfil GB ERP';
+      }
+    }
+  </script>
+</body>
+</html>

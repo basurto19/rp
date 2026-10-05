@@ -2,7 +2,6 @@
 import { Company } from '../models/company.model';
 import { BaseRepository } from '../../shared/repositories/base-repository';
 import { AppError } from '../../shared/errors/app-error';
-import { ICompany } from '../models/company.model';
 
 export class CompanyService {
   private repository: BaseRepository<any>;
