@@ -35,6 +35,12 @@ export const env = {
   jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
   bcryptSaltRounds: parseNumber('BCRYPT_SALT_ROUNDS', 12),
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:3001',
+  smtpHost: process.env.SMTP_HOST ?? '',
+  smtpPort: parseNumber('SMTP_PORT', 587),
+  smtpUser: process.env.SMTP_USER ?? '',
+  smtpPass: process.env.SMTP_PASS ?? '',
+  emailFrom: process.env.EMAIL_FROM ?? '',
+  frontendUrl: process.env.FRONTEND_URL ?? '',
   rateLimitMax: parseNumber('RATE_LIMIT_MAX', 100),
   rateLimitWindowMs: parseNumber('RATE_LIMIT_WINDOW_MS', 900000),
 };

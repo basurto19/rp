@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   apiBaseUrl,
+  apiErrorCode,
   apiErrorMessage,
   apiRequest,
   readStoredSession,
@@ -327,6 +328,15 @@ function App() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [registerError, setRegisterError] = useState('');
+  const [requiresEmailVerification, setRequiresEmailVerification] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
+  const [registrationPending, setRegistrationPending] = useState(false);
+  const [isVerificationRoute, setIsVerificationRoute] = useState(
+    () => new URLSearchParams(window.location.search).get('verify-email') === '1',
+  );
+  const [verificationState, setVerificationState] = useState<'loading' | 'success' | 'error'>('loading');
+  const [verificationError, setVerificationError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [activeModule, setActiveModule] = useState('dashboard');
@@ -347,6 +357,29 @@ function App() {
     window.addEventListener(SESSION_EVENT, syncSession);
     return () => window.removeEventListener(SESSION_EVENT, syncSession);
   }, []);
+
+  useEffect(() => {
+    if (!isVerificationRoute) return;
+
+    const token = new URLSearchParams(window.location.search).get('token');
+    if (!token) {
+      setVerificationState('error');
+      setVerificationError('El enlace de verificación no contiene un token válido.');
+      return;
+    }
+
+    let isCurrent = true;
+    setVerificationState('loading');
+    apiRequest('POST', '/auth/verify-email', { token }, null).then(() => {
+      if (isCurrent) setVerificationState('success');
+    }).catch((error: unknown) => {
+      if (!isCurrent) return;
+      setVerificationState('error');
+      setVerificationError(apiErrorMessage(error));
+    });
+
+    return () => { isCurrent = false; };
+  }, [isVerificationRoute]);
 
   const visibleModules = useMemo(
     () => session ? moduleDefinitions.filter((module) => hasPermission(session.user, module.permission)) : [],
@@ -395,8 +428,12 @@ function App() {
       setActiveModule('dashboard');
       setPassword('');
       setSessionMessage('');
+      setRequiresEmailVerification(false);
+      setResendMessage('');
     } catch (error: unknown) {
       setLoginError(apiErrorMessage(error));
+      setRequiresEmailVerification(apiErrorCode(error) === 'EMAIL_NOT_VERIFIED');
+      setResendMessage('');
     } finally {
       setIsLoggingIn(false);
     }
@@ -416,17 +453,41 @@ function App() {
         firstName: firstName.trim(), lastName: lastName.trim(), email: email.trim(), password, companyName: companyName.trim(),
       });
       if (!validation.success) throw new Error(validation.error.issues.map((issue) => issue.message).join(' '));
-      const nextSession = await apiRequest<Session>('POST', '/auth/register', validation.data, null);
-      saveSession(nextSession);
-      setActiveModule('dashboard');
+      await apiRequest<{ message: string }>('POST', '/auth/register', validation.data, null);
+      setRegistrationPending(true);
       setPassword('');
       setConfirmPassword('');
-      setSessionMessage('');
     } catch (error: unknown) {
       setRegisterError(apiErrorMessage(error));
     } finally {
       setIsRegistering(false);
     }
+  }
+
+  async function handleResendVerification(): Promise<void> {
+    setIsResendingVerification(true);
+    setResendMessage('');
+    try {
+      const result = await apiRequest<{ message: string }>(
+        'POST',
+        '/auth/resend-verification',
+        { email: email.trim() },
+        null,
+      );
+      setResendMessage(result.message);
+    } catch (error: unknown) {
+      setResendMessage(apiErrorMessage(error));
+    } finally {
+      setIsResendingVerification(false);
+    }
+  }
+
+  function returnToLogin(): void {
+    window.history.replaceState({}, '', '/');
+    setIsVerificationRoute(false);
+    setAuthMode('login');
+    setRegistrationPending(false);
+    setLoginError('');
   }
 
   async function handleLogout() {
@@ -513,6 +574,38 @@ function App() {
     Object.values(row).some((value) => formatCell(value).toLocaleLowerCase().includes(search.toLocaleLowerCase())),
   );
 
+  if (isVerificationRoute) {
+    return (
+      <View className="login-page">
+        <View className="login-brand-panel">
+          <Image className="login-logo" source={logoSource} accessibilityLabel="Logo de Apta Digital" />
+          <Text className="login-brand-caption">GESTIÓN EMPRESARIAL</Text>
+          <View className="brand-rule" />
+          <Text className="brand-statement">Un último paso para activar tu cuenta.</Text>
+          <Text className="brand-footnote">Verifica tu correo para acceder a tu organización.</Text>
+        </View>
+        <View className="login-form-panel">
+          <View className="login-form-wrap">
+            <Text className="eyebrow">VERIFICACIÓN DE CORREO</Text>
+            <Text accessibilityRole="header" className="login-title">
+              {verificationState === 'success' ? 'Correo verificado' : verificationState === 'loading' ? 'Verificando correo…' : 'No se pudo verificar'}
+            </Text>
+            {verificationState === 'loading' ? (
+              <View className="verification-status"><ActivityIndicator color="#0090a0" /><Text className="login-description">Estamos comprobando tu enlace.</Text></View>
+            ) : null}
+            {verificationState === 'success' ? <Text className="form-notice" role="status">Correo verificado correctamente. Ya puedes iniciar sesión.</Text> : null}
+            {verificationState === 'error' ? <Text className="form-error" role="alert">{verificationError}</Text> : null}
+            {verificationState !== 'loading' ? (
+              <Pressable className="primary-button" onPress={returnToLogin} accessibilityRole="button">
+                <Text className="primary-button-text">{session ? 'Continuar' : 'Ir al inicio de sesión'}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   if (!session) {
     return (
       <View className="login-page">
@@ -529,11 +622,20 @@ function App() {
             <Text accessibilityRole="header" className="login-title">{authMode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}</Text>
             <Text className="login-description">{authMode === 'login' ? 'Ingresa con las credenciales de tu cuenta.' : 'Registra tu empresa y crea su cuenta administradora.'}</Text>
             {sessionMessage ? <Text className="form-notice" accessibilityRole="alert">{sessionMessage}</Text> : null}
-            <View className="auth-mode-switch" role="group">
-              <Pressable className={`auth-mode-button${authMode === 'login' ? ' selected' : ''}`} onPress={() => { setAuthMode('login'); setRegisterError(''); }} accessibilityRole="button" accessibilityState={{ selected: authMode === 'login' }}><Text className="auth-mode-text">Iniciar sesión</Text></Pressable>
-              <Pressable className={`auth-mode-button${authMode === 'register' ? ' selected' : ''}`} onPress={() => { setAuthMode('register'); setLoginError(''); }} accessibilityRole="button" accessibilityState={{ selected: authMode === 'register' }}><Text className="auth-mode-text">Crear cuenta</Text></Pressable>
-            </View>
-            <form className="login-form" onSubmit={authMode === 'login' ? handleLogin : handleRegister}>
+            {registrationPending ? (
+              <View className="verification-pending">
+                <Text className="form-notice" role="status">Cuenta creada. Revisa tu correo para verificarla antes de iniciar sesión.</Text>
+                <Pressable className="secondary-button" onPress={() => { setRegistrationPending(false); setAuthMode('login'); }} accessibilityRole="button">
+                  <Text className="secondary-button-text">Volver al inicio de sesión</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <>
+                <View className="auth-mode-switch" role="group">
+                  <Pressable className={`auth-mode-button${authMode === 'login' ? ' selected' : ''}`} onPress={() => { setAuthMode('login'); setRegisterError(''); setRegistrationPending(false); }} accessibilityRole="button" accessibilityState={{ selected: authMode === 'login' }}><Text className="auth-mode-text">Iniciar sesión</Text></Pressable>
+                  <Pressable className={`auth-mode-button${authMode === 'register' ? ' selected' : ''}`} onPress={() => { setAuthMode('register'); setLoginError(''); setRequiresEmailVerification(false); }} accessibilityRole="button" accessibilityState={{ selected: authMode === 'register' }}><Text className="auth-mode-text">Crear cuenta</Text></Pressable>
+                </View>
+                <form className="login-form" onSubmit={authMode === 'login' ? handleLogin : handleRegister}>
               {authMode === 'register' ? (
                 <>
                   <View className="field-grid">
@@ -547,11 +649,21 @@ function App() {
               <View className="field-group"><label className="field-label" htmlFor="login-password">Contraseña</label><TextInput nativeID="login-password" className="text-field" value={password} onChangeText={setPassword} secureTextEntry autoComplete={authMode === 'login' ? 'current-password' : 'new-password'} accessibilityLabel="Contraseña" placeholder="Contraseña" minLength={authMode === 'register' ? 8 : 1} maxLength={128} required /></View>
               {authMode === 'register' ? <View className="field-group"><label className="field-label" htmlFor="register-confirm-password">Confirmar contraseña</label><TextInput nativeID="register-confirm-password" className="text-field" value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry autoComplete="new-password" accessibilityLabel="Confirmar contraseña" placeholder="Repite la contraseña" minLength={8} maxLength={128} required /></View> : null}
               {authMode === 'login' && loginError ? <Text className="form-error" accessibilityRole="alert">{loginError}</Text> : null}
+              {authMode === 'login' && requiresEmailVerification ? (
+                <View className="verification-resend">
+                  <Pressable className="secondary-button" onPress={handleResendVerification} disabled={isResendingVerification} accessibilityRole="button">
+                    <Text className="secondary-button-text">{isResendingVerification ? 'Enviando…' : 'Reenviar correo de verificación'}</Text>
+                  </Pressable>
+                  {resendMessage ? <Text className="form-notice" role="status">{resendMessage}</Text> : null}
+                </View>
+              ) : null}
               {authMode === 'register' && registerError ? <Text className="form-error" accessibilityRole="alert">{registerError}</Text> : null}
               <Pressable className="primary-button" accessibilityRole="button" disabled={isLoggingIn || isRegistering} type="submit">
                 {isLoggingIn || isRegistering ? <ActivityIndicator color="#ffffff" /> : <Text className="primary-button-text">{authMode === 'login' ? 'Entrar' : 'Crear cuenta'}</Text>}
               </Pressable>
-            </form>
+                </form>
+              </>
+            )}
             <Text className="api-caption">API: {apiBaseUrl || 'URL no configurada'}</Text>
           </View>
         </View>

@@ -2,6 +2,6 @@
 
 export { authenticateToken, authenticateRefreshToken } from './auth';
 export { validateTenant, authorizeRole } from './tenant';
-export { authLimiter, apiLimiter } from './rate-limiter';
+export { authLimiter, emailVerificationLimiter, resendVerificationLimiter, apiLimiter } from './rate-limiter';
 export { auditMiddleware } from './audit';
 export { errorHandler, notFoundHandler } from './errors';

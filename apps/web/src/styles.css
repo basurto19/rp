@@ -50,6 +50,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid #35b6c0; outline-
 @keyframes spin { to { transform: rotate(360deg); } }
 .form-error, .form-notice { display: block; margin: 4px 0; color: #a12b2b; font-size: 12px; line-height: 1.5; }
 .form-notice { padding: 10px 12px; border: 1px solid #ebd79e; border-radius: 4px; background: #fff6df; color: #805500; }
+.verification-pending, .verification-resend { display: grid; gap: 12px; }
+.verification-status { display: flex; align-items: center; gap: 10px; }
 .api-caption { display: block; margin-top: 22px; color: #89959e; font-size: 10px; overflow-wrap: anywhere; }
 
 .app-frame { display: grid; min-height: 100vh; grid-template-columns: 252px minmax(0, 1fr); }

@@ -127,3 +127,12 @@ export function apiErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return 'Ocurrió un error. Intenta nuevamente.';
 }
+
+export function apiErrorCode(error: unknown): string | null {
+  if (!axios.isAxiosError(error)) return null;
+  const responseData: unknown = error.response?.data;
+  if (typeof responseData !== 'object' || responseData === null || !('error' in responseData)) return null;
+  const apiError = responseData.error;
+  if (typeof apiError !== 'object' || apiError === null || !('code' in apiError)) return null;
+  return typeof apiError.code === 'string' ? apiError.code : null;
+}

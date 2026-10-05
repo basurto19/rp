@@ -10,6 +10,8 @@ export interface IUser {
   lastName: string;
   roleId: string;
   status: string;
+  emailVerified: boolean;
+  emailVerifiedAt: Date | null;
   refreshToken: string | null;
   refreshTokenExpiry: Date | null;
   lastLoginAt: Date | null;
@@ -24,6 +26,8 @@ const userSchema = new Schema<IUser>({
   lastName: { type: String, required: true, maxlength: 100 },
   roleId: { type: String, required: true },
   status: { type: String, enum: ['active', 'inactive', 'locked'], default: 'active' },
+  emailVerified: { type: Boolean, default: true },
+  emailVerifiedAt: { type: Date, default: null },
   refreshToken: { type: String },
   refreshTokenExpiry: { type: Date },
   lastLoginAt: { type: Date },

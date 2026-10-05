@@ -50,5 +50,27 @@ describe('API Routes', () => {
         .send({ refreshToken: 'not-a-real-token' })
         .expect(401);
     });
+
+    describe('Email verification routes', () => {
+      it('POST /api/v1/auth/verify-email validates the token body without authentication', async () => {
+        const response = await request(app)
+          .post('/api/v1/auth/verify-email')
+          .send({})
+          .expect(400);
+
+        expect(response.body.success).toBe(false);
+        expect(response.body.error.code).toBe('VALIDATION_ERROR');
+      });
+
+      it('POST /api/v1/auth/resend-verification validates the email body without authentication', async () => {
+        const response = await request(app)
+          .post('/api/v1/auth/resend-verification')
+          .send({ email: 'invalid' })
+          .expect(400);
+
+        expect(response.body.success).toBe(false);
+        expect(response.body.error.code).toBe('VALIDATION_ERROR');
+      });
+    });
   });
 });

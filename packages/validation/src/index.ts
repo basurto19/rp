@@ -18,6 +18,14 @@ export const registerSchema = z.object({
   companyName: z.string().trim().min(1, 'El nombre de la empresa es obligatorio').max(200),
 });
 
+export const verifyEmailSchema = z.object({
+  token: z.string().min(1, 'Token de verificación requerido').max(256),
+});
+
+export const resendVerificationSchema = z.object({
+  email: z.string().trim().email('Formato de email inválido').max(254),
+});
+
 export const refreshTokenSchema = z.object({
   refreshToken: z.string().min(1, 'Token de refresco inválido'),
 });

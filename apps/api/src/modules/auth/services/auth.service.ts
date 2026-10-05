@@ -1,10 +1,13 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import mongoose from 'mongoose';
+import { createHash, randomBytes } from 'node:crypto';
 import { User } from '../../users/models/user.model';
 import { Company } from '../../companies/models/company.model';
 import { Role } from '../../roles/models/role.model';
 import { Token } from '../models/token.model';
+import { EmailVerificationToken } from '../models/email-verification-token.model';
+import { sendVerificationEmail } from './email.service';
 import { AppError } from '../../shared/errors/app-error';
 import { env } from '../../../config/env';
 import { generateTenantId } from '../../shared/utils';
@@ -18,10 +21,11 @@ interface RegisterInput {
   companyName: string;
 }
 
-interface AuthSession {
-  accessToken: string;
-  refreshToken: string;
-  user: Record<string, unknown>;
+const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+const RESEND_VERIFICATION_MESSAGE = 'Si la cuenta existe y aún no está verificada, enviaremos un correo de verificación.';
+
+function hashVerificationToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
 }
 
 const adminPermissions = [
@@ -34,13 +38,13 @@ const adminPermissions = [
 ];
 
 export class AuthService {
-  async register(input: RegisterInput): Promise<AuthSession> {
+  async register(input: RegisterInput): Promise<{ message: string }> {
     const email = input.email.toLowerCase();
     const passwordHash = await bcrypt.hash(input.password, env.bcryptSaltRounds);
     const tenantId = generateTenantId();
     const roleId = ROLES.ADMIN;
     const mongoSession = await mongoose.startSession();
-    let authSession: AuthSession | undefined;
+    let registeredUser: { id: string; email: string; firstName: string } | undefined;
 
     try {
       await mongoSession.withTransaction(async () => {
@@ -78,32 +82,36 @@ export class AuthService {
           lastName: input.lastName,
           roleId,
           status: 'active',
+          emailVerified: false,
+          emailVerifiedAt: null,
         });
         await user.save({ session: mongoSession });
 
-        const accessToken = this.generateAccessToken(user, adminPermissions);
-        const refreshToken = this.generateRefreshToken(user);
-        const token = new Token({
-          userId: user._id.toString(),
-          tenantId,
-          refreshToken,
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-          revoked: false,
-        });
-        await token.save({ session: mongoSession });
-
-        authSession = {
-          accessToken,
-          refreshToken,
-          user: this.sanitizeUser(user, adminPermissions),
+        registeredUser = {
+          id: user._id.toString(),
+          email: user.email,
+          firstName: user.firstName,
         };
       });
     } finally {
       await mongoSession.endSession();
     }
 
-    if (!authSession) throw new AppError('DATABASE_ERROR', 'No se pudo crear la cuenta');
-    return authSession;
+    if (!registeredUser) throw new AppError('DATABASE_ERROR', 'No se pudo crear la cuenta');
+
+    const token = await this.replaceEmailVerificationToken(registeredUser.id);
+    try {
+      await sendVerificationEmail({ ...registeredUser, token });
+    } catch {
+      console.error('Verification email delivery failed during registration');
+      throw new AppError(
+        'EMAIL_DELIVERY_FAILED',
+        'La cuenta fue creada, pero no se pudo enviar el correo. Solicita un nuevo enlace de verificación.',
+        503,
+      );
+    }
+
+    return { message: 'Cuenta creada. Revisa tu correo para verificarla.' };
   }
 
   async login(email: string, password: string) {
@@ -112,6 +120,9 @@ export class AuthService {
     if (user.status === 'locked') throw new AppError('USER_LOCKED', 'Usuario bloqueado', 403);
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) throw new AppError('INVALID_CREDENTIALS', 'Credenciales inválidas', 401);
+    if (user.emailVerified === false) {
+      throw new AppError('EMAIL_NOT_VERIFIED', 'Verifica tu correo antes de iniciar sesión.', 403);
+    }
 
     const permissions = await this.getPermissions(user);
     const accessToken = this.generateAccessToken(user, permissions);
@@ -133,6 +144,43 @@ export class AuthService {
     };
   }
 
+  async verifyEmail(token: string): Promise<{ message: string }> {
+    const now = new Date();
+    const verification = await EmailVerificationToken.findOneAndDelete({
+      tokenHash: hashVerificationToken(token),
+      expiresAt: { $gt: now },
+    }).exec();
+
+    if (!verification) {
+      throw new AppError('INVALID_VERIFICATION_TOKEN', 'El enlace de verificación no es válido o ha expirado.', 400);
+    }
+
+    const user = await User.findByIdAndUpdate(
+      verification.userId,
+      { emailVerified: true, emailVerifiedAt: now },
+      { new: true },
+    ).exec();
+    if (!user) {
+      throw new AppError('INVALID_VERIFICATION_TOKEN', 'El enlace de verificación no es válido o ha expirado.', 400);
+    }
+
+    return { message: 'Correo verificado correctamente.' };
+  }
+
+  async resendVerification(email: string): Promise<{ message: string }> {
+    const user = await User.findOne({ email: email.toLowerCase(), emailVerified: false }).exec();
+    if (!user) return { message: RESEND_VERIFICATION_MESSAGE };
+
+    const token = await this.replaceEmailVerificationToken(user._id.toString());
+    try {
+      await sendVerificationEmail({ email: user.email, firstName: user.firstName, token });
+    } catch {
+      console.error('Verification email delivery failed during resend');
+    }
+
+    return { message: RESEND_VERIFICATION_MESSAGE };
+  }
+
   async refreshToken(refreshTokenStr: string) {
     const decoded = jwt.verify(refreshTokenStr, env.jwtRefreshSecret) as any;
     const tokenRecord = await Token.findOne({ refreshToken: refreshTokenStr, revoked: false }).exec();
@@ -143,6 +191,10 @@ export class AuthService {
     }
     const user = await User.findById(decoded.userId).exec();
     if (!user || user.status === 'locked') throw new AppError('USER_NOT_FOUND', 'Usuario no encontrado', 404);
+    if (user.emailVerified === false) {
+      await Token.findOneAndUpdate({ refreshToken: refreshTokenStr }, { revoked: true }).exec();
+      throw new AppError('EMAIL_NOT_VERIFIED', 'Verifica tu correo antes de iniciar sesión.', 403);
+    }
     const permissions = await this.getPermissions(user);
     const newAccessToken = this.generateAccessToken(user, permissions);
     return { accessToken: newAccessToken };
@@ -179,6 +231,20 @@ export class AuthService {
   private async getPermissions(user: any): Promise<unknown[]> {
     const role = await Role.findOne({ tenantId: user.tenantId, roleId: user.roleId }).exec();
     return role?.permissions ?? user.permissions ?? [];
+  }
+
+  private async replaceEmailVerificationToken(userId: string): Promise<string> {
+    const token = randomBytes(32).toString('hex');
+    await EmailVerificationToken.findOneAndUpdate(
+      { userId },
+      {
+        userId,
+        tokenHash: hashVerificationToken(token),
+        expiresAt: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    ).exec();
+    return token;
   }
 
   private generateAccessToken(user: any, permissions: unknown[] = []): string {
