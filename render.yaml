@@ -32,9 +32,9 @@ services:
       - key: RATE_LIMIT_WINDOW_MS
         value: 900000
 
-  - type: static
+  - type: web
     name: erp-web
-    plan: free
+    runtime: static
     rootDir: .
     buildCommand: pnpm install --frozen-lockfile && pnpm --filter @erp/web run build
     staticPublishPath: apps/web/dist
