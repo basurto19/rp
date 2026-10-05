@@ -6,7 +6,10 @@ import { Company } from '../../src/modules/companies/models/company.model';
 import { Role } from '../../src/modules/roles/models/role.model';
 import { Token } from '../../src/modules/auth/models/token.model';
 import { EmailVerificationToken } from '../../src/modules/auth/models/email-verification-token.model';
-import { sendVerificationEmail } from '../../src/modules/auth/services/email.service';
+import {
+  logEmailDeliveryFailure,
+  sendVerificationEmail,
+} from '../../src/modules/auth/services/email.service';
 import { AppError } from '../../src/modules/shared/errors/app-error';
 
 jest.mock('bcrypt', () => ({
@@ -64,6 +67,7 @@ jest.mock('../../src/modules/auth/models/email-verification-token.model', () => 
 
 jest.mock('../../src/modules/auth/services/email.service', () => ({
   sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
+  logEmailDeliveryFailure: jest.fn(),
 }));
 
 function query<T>(value: T) {
@@ -137,6 +141,33 @@ describe('AuthService email verification', () => {
       expect.objectContaining({ tokenHash: sentToken }),
       expect.anything(),
     );
+  });
+
+  it('keeps the created account when email delivery fails so it can be resent', async () => {
+    (User.findOne as jest.Mock).mockReturnValue({
+      session: jest.fn().mockReturnValue(query(null)),
+    });
+    (sendVerificationEmail as jest.Mock).mockRejectedValueOnce(
+      Object.assign(new Error('SMTP unavailable'), { code: 'ETIMEDOUT' }),
+    );
+
+    await expect(
+      authService.register({
+        firstName: 'Ana',
+        lastName: 'Pérez',
+        email: 'ana@example.com',
+        password: 'password123',
+        companyName: 'Empresa',
+      }),
+    ).rejects.toMatchObject({ code: 'EMAIL_DELIVERY_FAILED' });
+
+    expect((User as unknown as jest.Mock).mock.instances[0]).toMatchObject({
+      email: 'ana@example.com',
+      emailVerified: false,
+    });
+    expect(EmailVerificationToken.findOneAndUpdate).toHaveBeenCalledTimes(1);
+    expect(Token.create).not.toHaveBeenCalled();
+    expect(logEmailDeliveryFailure).toHaveBeenCalledWith(expect.any(Error), 'registration');
   });
 
   it('rejects valid-credential login until a new account verifies its email', async () => {
@@ -295,5 +326,25 @@ describe('AuthService email verification', () => {
 
     expect(unknownResponse).toEqual(knownResponse);
     expect(sendVerificationEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps resend responses generic when the provider fails', async () => {
+    const user = {
+      _id: 'resend-user',
+      email: 'user@example.com',
+      firstName: 'Ari',
+      emailVerified: false,
+    };
+    (User.findOne as jest.Mock).mockReturnValue(query(user));
+    (sendVerificationEmail as jest.Mock).mockRejectedValueOnce(
+      Object.assign(new Error('provider response contains secret data'), { statusCode: 503 }),
+    );
+
+    const response = await authService.resendVerification(user.email);
+
+    expect(response.message).toBe(
+      'Si la cuenta existe y aún no está verificada, enviaremos un correo de verificación.',
+    );
+    expect(logEmailDeliveryFailure).toHaveBeenCalledWith(expect.any(Error), 'resend');
   });
 });

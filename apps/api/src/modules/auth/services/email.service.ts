@@ -1,4 +1,3 @@
-import nodemailer, { type Transporter } from 'nodemailer';
 import { env } from '../../../config/env';
 
 interface VerificationEmail {
@@ -14,7 +13,25 @@ interface OutgoingEmail {
   html: string;
 }
 
-let transporter: Transporter | undefined;
+const RESEND_REQUEST_TIMEOUT_MS = 10_000;
+const RESEND_EMAILS_URL = 'https://api.resend.com/emails';
+
+type EmailFailureCategory =
+  | 'request_timeout'
+  | 'authentication_rejected'
+  | 'permission_rejected'
+  | 'rate_limited'
+  | 'provider_rejected'
+  | 'provider_unavailable'
+  | 'network_error'
+  | 'unknown';
+
+class ResendApiError extends Error {
+  constructor(readonly statusCode: number) {
+    super('Resend email request failed');
+    this.name = 'ResendApiError';
+  }
+}
 
 function escapeHtml(value: string): string {
   return value.replace(
@@ -40,23 +57,65 @@ function getVerificationUrl(token: string): string {
   return url.toString();
 }
 
-async function getTransporter(): Promise<Transporter> {
-  if (!env.smtpHost || !env.emailFrom) {
-    throw new Error('SMTP email delivery is not configured');
+function ensureResendConfiguration(): void {
+  if (!env.resendApiKey || !env.emailFrom) {
+    throw new Error('Resend email delivery is not configured');
+  }
+}
+
+function emailFailureDetails(error: unknown): {
+  category: EmailFailureCategory;
+  statusCode?: number;
+} {
+  const details =
+    typeof error === 'object' && error !== null ? (error as Record<string, unknown>) : {};
+  const name = typeof details.name === 'string' ? details.name : '';
+  const code = typeof details.code === 'string' ? details.code : '';
+  const statusCode =
+    typeof details.statusCode === 'number' &&
+    Number.isInteger(details.statusCode) &&
+    details.statusCode >= 100 &&
+    details.statusCode <= 599
+      ? details.statusCode
+      : undefined;
+
+  let category: EmailFailureCategory = 'unknown';
+  if (name === 'TimeoutError' || name === 'AbortError') {
+    category = 'request_timeout';
+  } else if (statusCode === 401) {
+    category = 'authentication_rejected';
+  } else if (statusCode === 403) {
+    category = 'permission_rejected';
+  } else if (statusCode === 429) {
+    category = 'rate_limited';
+  } else if (statusCode !== undefined && statusCode >= 500) {
+    category = 'provider_unavailable';
+  } else if (statusCode !== undefined && statusCode >= 400) {
+    category = 'provider_rejected';
+  } else if (code === 'ETIMEDOUT' || code === 'ECONNRESET' || code === 'ECONNREFUSED') {
+    category = 'network_error';
   }
 
-  transporter ??= nodemailer.createTransport({
-    host: env.smtpHost,
-    port: env.smtpPort,
-    secure: env.smtpPort === 465,
-    ...(env.smtpUser || env.smtpPass ? { auth: { user: env.smtpUser, pass: env.smtpPass } } : {}),
-  });
-  return transporter;
+  return { category, ...(statusCode !== undefined ? { statusCode } : {}) };
+}
+
+export function logEmailDeliveryFailure(error: unknown, context: 'registration' | 'resend'): void {
+  console.error('Email provider delivery failed', { context, ...emailFailureDetails(error) });
 }
 
 export async function sendEmail({ to, subject, text, html }: OutgoingEmail): Promise<void> {
-  const mailer = await getTransporter();
-  await mailer.sendMail({ from: env.emailFrom, to, subject, text, html });
+  ensureResendConfiguration();
+  const response = await fetch(RESEND_EMAILS_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.resendApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ from: env.emailFrom, to, subject, text, html }),
+    signal: AbortSignal.timeout(RESEND_REQUEST_TIMEOUT_MS),
+  });
+
+  if (!response.ok) throw new ResendApiError(response.status);
 }
 
 export async function sendVerificationEmail({

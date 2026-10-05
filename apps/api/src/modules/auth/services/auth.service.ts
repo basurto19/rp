@@ -7,7 +7,7 @@ import { Company } from '../../companies/models/company.model';
 import { Role } from '../../roles/models/role.model';
 import { Token } from '../models/token.model';
 import { EmailVerificationToken } from '../models/email-verification-token.model';
-import { sendVerificationEmail } from './email.service';
+import { logEmailDeliveryFailure, sendVerificationEmail } from './email.service';
 import { AppError } from '../../shared/errors/app-error';
 import { env } from '../../../config/env';
 import { generateTenantId } from '../../shared/utils';
@@ -102,8 +102,8 @@ export class AuthService {
     const token = await this.replaceEmailVerificationToken(registeredUser.id);
     try {
       await sendVerificationEmail({ ...registeredUser, token });
-    } catch {
-      console.error('Verification email delivery failed during registration');
+    } catch (error: unknown) {
+      logEmailDeliveryFailure(error, 'registration');
       throw new AppError(
         'EMAIL_DELIVERY_FAILED',
         'La cuenta fue creada, pero no se pudo enviar el correo. Solicita un nuevo enlace de verificación.',
@@ -174,8 +174,8 @@ export class AuthService {
     const token = await this.replaceEmailVerificationToken(user._id.toString());
     try {
       await sendVerificationEmail({ email: user.email, firstName: user.firstName, token });
-    } catch {
-      console.error('Verification email delivery failed during resend');
+    } catch (error: unknown) {
+      logEmailDeliveryFailure(error, 'resend');
     }
 
     return { message: RESEND_VERIFICATION_MESSAGE };

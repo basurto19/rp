@@ -2,6 +2,7 @@
 
 import request from 'supertest';
 import { createApp } from '../../src/app';
+import { env } from '../../src/config/env';
 
 describe('API Routes', () => {
   let app: import('express').Application;
@@ -18,6 +19,28 @@ describe('API Routes', () => {
 
       expect(response.body.success).toBe(true);
       expect(response.body.data.status).toBe('ok');
+    });
+  });
+
+  describe('Proxy configuration', () => {
+    it('trusts only the Render proxy hop in production', () => {
+      const originalNodeEnv = env.nodeEnv;
+      env.nodeEnv = 'production';
+      try {
+        expect(createApp().get('trust proxy')).toBe(1);
+      } finally {
+        env.nodeEnv = originalNodeEnv;
+      }
+    });
+
+    it('does not trust a proxy outside production', () => {
+      const originalNodeEnv = env.nodeEnv;
+      env.nodeEnv = 'test';
+      try {
+        expect(createApp().get('trust proxy')).toBe(false);
+      } finally {
+        env.nodeEnv = originalNodeEnv;
+      }
     });
   });
 

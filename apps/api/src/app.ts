@@ -10,6 +10,7 @@ import { apiLimiter } from './middleware/rate-limiter';
 export const createApp = (): express.Application => {
   const app = express();
 
+  app.set('trust proxy', env.nodeEnv === 'production' ? 1 : false);
   app.disable('x-powered-by');
   app.use(helmet());
   app.use(cors({ origin: env.corsOrigin }));
