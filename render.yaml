@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     rootDir: .
-    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @erp/api run build
+    buildCommand: pnpm install --frozen-lockfile --prod=false && pnpm --filter @erp/api run build
     startCommand: pnpm --filter @erp/api run start
     healthCheckPath: /health
     autoDeploy: true
@@ -36,7 +36,7 @@ services:
     name: erp-web
     runtime: static
     rootDir: .
-    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @erp/web run build
+    buildCommand: pnpm install --frozen-lockfile --prod=false && pnpm --filter @erp/web run build
     staticPublishPath: apps/web/dist
     envVars:
       - key: ERP_API_BASE_URL
