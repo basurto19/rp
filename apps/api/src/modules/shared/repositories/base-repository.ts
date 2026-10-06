@@ -23,8 +23,8 @@ export class BaseRepository<T extends Document = Document> {
     this.model = model;
   }
 
-  protected getTenantFilter(tenantId: string): FilterQuery {
-    return { tenantId };
+  protected getTenantFilter(tenantId: string, acrossTenants: boolean): FilterQuery {
+    return acrossTenants ? {} : { tenantId };
   }
 
   protected getBranchFilter(branchId: string | null): FilterQuery {
@@ -36,16 +36,19 @@ export class BaseRepository<T extends Document = Document> {
     tenantId: string,
     branchId: string | null,
     additionalFilter: FilterQuery = {},
+    acrossTenants = false,
   ): FilterQuery {
     return {
-      ...this.getTenantFilter(tenantId),
-      ...this.getBranchFilter(branchId),
+      ...this.getTenantFilter(tenantId, acrossTenants),
+      ...this.getBranchFilter(acrossTenants ? null : branchId),
       ...additionalFilter,
     };
   }
 
-  async findById(id: string, tenantId: string): Promise<T | null> {
-    return this.model.findOne({ _id: id, tenantId }).exec() as Promise<T | null>;
+  async findById(id: string, tenantId: string, acrossTenants = false): Promise<T | null> {
+    return this.model
+      .findOne({ _id: id, ...this.getTenantFilter(tenantId, acrossTenants) })
+      .exec() as Promise<T | null>;
   }
 
   async findAll(
@@ -53,9 +56,10 @@ export class BaseRepository<T extends Document = Document> {
     branchId: string | null = null,
     filter: FilterQuery = {},
     pagination?: PaginationOptions & SortOptions,
+    acrossTenants = false,
   ): Promise<{ data: T[]; total: number; page: number; limit: number; hasMore: boolean }> {
     const { page = 1, limit = 20, sortBy, sortOrder } = pagination || {};
-    const combinedFilter = this.getCombinedFilter(tenantId, branchId, filter);
+    const combinedFilter = this.getCombinedFilter(tenantId, branchId, filter, acrossTenants);
 
     const [total, data] = await Promise.all([
       this.model.countDocuments(combinedFilter).exec() as Promise<number>,
@@ -85,14 +89,21 @@ export class BaseRepository<T extends Document = Document> {
     id: string,
     tenantId: string,
     updateData: Record<string, unknown>,
+    acrossTenants = false,
   ): Promise<T | null> {
     return this.model
-      .findOneAndUpdate({ _id: id, tenantId }, { $set: { ...updateData, updatedAt: new Date() } }, { new: true })
+      .findOneAndUpdate(
+        { _id: id, ...this.getTenantFilter(tenantId, acrossTenants) },
+        { $set: { ...updateData, updatedAt: new Date() } },
+        { new: true },
+      )
       .exec() as Promise<T | null>;
   }
 
-  async deleteById(id: string, tenantId: string): Promise<boolean> {
-    const result = await this.model.deleteOne({ _id: id, tenantId }).exec();
+  async deleteById(id: string, tenantId: string, acrossTenants = false): Promise<boolean> {
+    const result = await this.model
+      .deleteOne({ _id: id, ...this.getTenantFilter(tenantId, acrossTenants) })
+      .exec();
     return result.deletedCount === 1;
   }
 
@@ -101,8 +112,12 @@ export class BaseRepository<T extends Document = Document> {
     return count > 0;
   }
 
-  async findOne(filter: FilterQuery): Promise<T | null> {
-    return this.model.findOne(filter).exec() as Promise<T | null>;
+  async findOne(filter: FilterQuery, acrossTenants = false): Promise<T | null> {
+    if (!acrossTenants) return this.model.findOne(filter).exec() as Promise<T | null>;
+    const globalFilter = Object.fromEntries(
+      Object.entries(filter).filter(([key]) => key !== 'tenantId'),
+    );
+    return this.model.findOne(globalFilter).exec() as Promise<T | null>;
   }
 
   async count(filter: FilterQuery = {}): Promise<number> {

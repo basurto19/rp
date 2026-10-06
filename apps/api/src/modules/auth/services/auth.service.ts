@@ -7,11 +7,17 @@ import { Company } from '../../companies/models/company.model';
 import { Role } from '../../roles/models/role.model';
 import { Token } from '../models/token.model';
 import { EmailVerificationToken } from '../models/email-verification-token.model';
-import { logEmailDeliveryFailure, sendVerificationEmail, sendWelcomeEmail } from './email.service';
+import {
+  logEmailDeliveryFailure,
+  sendAdminRegistrationNotification,
+  sendVerificationEmail,
+  sendWelcomeEmail,
+} from './email.service';
 import { AppError } from '../../shared/errors/app-error';
 import { env } from '../../../config/env';
 import { generateTenantId } from '../../shared/utils';
 import { ROLES } from '@erp/constants';
+import { copyPrimaryAdminPermissions } from './primary-admin-permissions';
 
 interface RegisterInput {
   firstName: string;
@@ -19,6 +25,14 @@ interface RegisterInput {
   email: string;
   password: string;
   companyName: string;
+}
+
+interface RegisteredUserNotification {
+  email: string;
+  firstName: string;
+  lastName: string;
+  companyName: string;
+  registeredAt: Date;
 }
 
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -30,23 +44,14 @@ function hashVerificationToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
-const adminPermissions = [
-  { module: 'users', actions: { read: true, create: true, update: true, delete: true } },
-  { module: 'companies', actions: { read: true, create: true, update: true, delete: true } },
-  { module: 'branches', actions: { read: true, create: true, update: true, delete: true } },
-  { module: 'roles', actions: { read: true, create: true, update: true, delete: true } },
-  { module: 'settings', actions: { read: true, update: true, delete: true } },
-  { module: 'audit', actions: { read: true } },
-];
-
 export class AuthService {
   async register(input: RegisterInput): Promise<{ message: string }> {
-    const email = input.email.toLowerCase();
+    const email = input.email.trim().toLowerCase();
     const passwordHash = await bcrypt.hash(input.password, env.bcryptSaltRounds);
     const tenantId = generateTenantId();
-    const roleId = ROLES.ADMIN;
+    const roleId = ROLES.USER;
     const mongoSession = await mongoose.startSession();
-    let registeredUser: { id: string; email: string; firstName: string } | undefined;
+    let registeredUser: RegisteredUserNotification | undefined;
 
     try {
       await mongoSession.withTransaction(async () => {
@@ -67,9 +72,9 @@ export class AuthService {
         const role = new Role({
           tenantId,
           roleId,
-          name: 'Administrador',
-          description: 'Administrador inicial de la empresa',
-          permissions: adminPermissions,
+          name: 'Usuario',
+          description: 'Usuario estándar de la empresa',
+          permissions: [],
           scope: 'company',
           isSystem: true,
         });
@@ -83,6 +88,7 @@ export class AuthService {
           firstName: input.firstName,
           lastName: input.lastName,
           roleId,
+          isPrimaryAdmin: false,
           status: 'active',
           emailVerified: false,
           emailVerifiedAt: null,
@@ -90,9 +96,11 @@ export class AuthService {
         await user.save({ session: mongoSession });
 
         registeredUser = {
-          id: user._id.toString(),
           email: user.email,
           firstName: user.firstName,
+          lastName: user.lastName,
+          companyName: company.name,
+          registeredAt: user.createdAt ?? new Date(),
         };
       });
     } finally {
@@ -101,33 +109,25 @@ export class AuthService {
 
     if (!registeredUser) throw new AppError('DATABASE_ERROR', 'No se pudo crear la cuenta');
 
-    const token = await this.replaceEmailVerificationToken(registeredUser.id);
-    try {
-      await sendVerificationEmail({ ...registeredUser, token });
-    } catch (error: unknown) {
-      logEmailDeliveryFailure(error, 'registration');
-      throw new AppError(
-        'EMAIL_DELIVERY_FAILED',
-        'La cuenta fue creada, pero no se pudo enviar el correo. Solicita un nuevo enlace de verificación.',
-        503,
-      );
-    }
+    void this.notifyAdminOfRegistration(registeredUser).catch(() => {
+      console.error('Admin registration notification failed', {
+        context: 'admin_registration',
+        category: 'unknown',
+      });
+    });
 
-    return { message: 'Cuenta creada. Revisa tu correo para verificarla.' };
+    return { message: 'Cuenta creada correctamente. Ya puedes iniciar sesión.' };
   }
 
   async login(email: string, password: string) {
-    const user = await User.findOne({ email }).exec();
+    const user = await User.findOne({ email: email.trim().toLowerCase() }).exec();
     if (!user) throw new AppError('INVALID_CREDENTIALS', 'Credenciales inválidas', 401);
     if (user.status === 'locked') throw new AppError('USER_LOCKED', 'Usuario bloqueado', 403);
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) throw new AppError('INVALID_CREDENTIALS', 'Credenciales inválidas', 401);
-    if (user.emailVerified === false) {
-      throw new AppError('EMAIL_NOT_VERIFIED', 'Verifica tu correo antes de iniciar sesión.', 403);
-    }
-
+    const effectiveRoleId = user.isPrimaryAdmin === true ? ROLES.SUPER_ADMIN : ROLES.USER;
     const permissions = await this.getPermissions(user);
-    const accessToken = this.generateAccessToken(user, permissions);
+    const accessToken = this.generateAccessToken(user, permissions, effectiveRoleId);
     const refreshToken = this.generateRefreshToken(user);
 
     await Token.create({
@@ -148,7 +148,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      user: this.sanitizeUser(user, permissions),
+      user: this.sanitizeUser(user, permissions, effectiveRoleId),
     };
   }
 
@@ -184,7 +184,10 @@ export class AuthService {
   }
 
   async resendVerification(email: string): Promise<{ message: string }> {
-    const user = await User.findOne({ email: email.toLowerCase(), emailVerified: false }).exec();
+    const user = await User.findOne({
+      email: email.trim().toLowerCase(),
+      $or: [{ emailVerified: false }, { emailVerified: { $exists: false } }],
+    }).exec();
     if (!user) return { message: RESEND_VERIFICATION_MESSAGE };
 
     const token = await this.replaceEmailVerificationToken(user._id.toString());
@@ -211,12 +214,9 @@ export class AuthService {
     const user = await User.findById(decoded.userId).exec();
     if (!user || user.status === 'locked')
       throw new AppError('USER_NOT_FOUND', 'Usuario no encontrado', 404);
-    if (user.emailVerified === false) {
-      await Token.findOneAndUpdate({ refreshToken: refreshTokenStr }, { revoked: true }).exec();
-      throw new AppError('EMAIL_NOT_VERIFIED', 'Verifica tu correo antes de iniciar sesión.', 403);
-    }
+    const effectiveRoleId = user.isPrimaryAdmin === true ? ROLES.SUPER_ADMIN : ROLES.USER;
     const permissions = await this.getPermissions(user);
-    const newAccessToken = this.generateAccessToken(user, permissions);
+    const newAccessToken = this.generateAccessToken(user, permissions, effectiveRoleId);
     return { accessToken: newAccessToken };
   }
 
@@ -233,11 +233,12 @@ export class AuthService {
     return { success: true };
   }
 
-  async forgotPassword(email: string, tenantId: string) {
-    const user = await User.findOne({ email, tenantId }).exec();
-    if (!user) throw new AppError('USER_NOT_FOUND', 'Usuario no encontrado', 404);
-    const resetToken = jwt.sign({ userId: user._id, tenantId }, env.jwtSecret, { expiresIn: '1h' });
-    return { resetToken, message: 'Token de recuperación generado' };
+  async forgotPassword(_email: string, _tenantId: string) {
+    throw new AppError(
+      'PASSWORD_RECOVERY_UNAVAILABLE',
+      'La recuperación de contraseña no está disponible actualmente',
+      501,
+    );
   }
 
   async changePassword(userId: string, currentPassword: string, newPassword: string) {
@@ -252,8 +253,25 @@ export class AuthService {
   }
 
   private async getPermissions(user: any): Promise<unknown[]> {
-    const role = await Role.findOne({ tenantId: user.tenantId, roleId: user.roleId }).exec();
-    return role?.permissions ?? user.permissions ?? [];
+    if (user.isPrimaryAdmin !== true) return [];
+    const role = await Role.findOne({
+      tenantId: user.tenantId,
+      roleId: ROLES.SUPER_ADMIN,
+    }).exec();
+    return role?.permissions ?? copyPrimaryAdminPermissions();
+  }
+
+  private async notifyAdminOfRegistration(user: RegisteredUserNotification): Promise<void> {
+    if (!env.adminEmail) {
+      logEmailDeliveryFailure(new Error('ADMIN_EMAIL is not configured'), 'admin_registration');
+      return;
+    }
+
+    try {
+      await sendAdminRegistrationNotification({ to: env.adminEmail, ...user });
+    } catch (error: unknown) {
+      logEmailDeliveryFailure(error, 'admin_registration');
+    }
   }
 
   private async replaceEmailVerificationToken(userId: string): Promise<string> {
@@ -326,13 +344,18 @@ export class AuthService {
     });
   }
 
-  private generateAccessToken(user: any, permissions: unknown[] = []): string {
+  private generateAccessToken(
+    user: any,
+    permissions: unknown[] = [],
+    roleId: string = ROLES.USER,
+  ): string {
     return jwt.sign(
       {
         userId: user._id,
         tenantId: user.tenantId,
         branchId: user.branchId || null,
-        roleId: user.roleId,
+        roleId,
+        isPrimaryAdmin: user.isPrimaryAdmin === true,
         permissions,
       },
       env.jwtSecret,
@@ -351,7 +374,7 @@ export class AuthService {
     );
   }
 
-  private sanitizeUser(user: any, permissions: unknown[] = []) {
+  private sanitizeUser(user: any, permissions: unknown[] = [], roleId: string = ROLES.USER) {
     return {
       id: user._id,
       tenantId: user.tenantId,
@@ -359,7 +382,7 @@ export class AuthService {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      roleId: user.roleId,
+      roleId,
       status: user.status,
       permissions,
     };

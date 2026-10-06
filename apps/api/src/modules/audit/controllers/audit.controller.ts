@@ -13,7 +13,13 @@ export class AuditController {
     const tenantId = (request as any).tenantId;
     const page = parseInt(request.query.page as string) || 1;
     const limit = parseInt(request.query.limit as string) || 20;
-    const result = await this.service.getByTenant(tenantId, {}, page, limit);
+    const result = await this.service.getByTenant(
+      tenantId,
+      {},
+      page,
+      limit,
+      (request as any).isPrimaryAdmin === true,
+    );
     return successResponse(response, result);
   }
 
@@ -22,7 +28,13 @@ export class AuditController {
     const { module } = request.params as { module: string };
     const page = parseInt(request.query.page as string) || 1;
     const limit = parseInt(request.query.limit as string) || 20;
-    const result = await this.service.getByModule(tenantId, module, page, limit);
+    const result = await this.service.getByModule(
+      tenantId,
+      module,
+      page,
+      limit,
+      (request as any).isPrimaryAdmin === true,
+    );
     return successResponse(response, result);
   }
 }

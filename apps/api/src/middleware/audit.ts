@@ -25,51 +25,58 @@ function flushAuditQueue(): void {
 setInterval(flushAuditQueue, AUDIT_FLUSH_INTERVAL_MS).unref();
 
 export function auditMiddleware(action: string, module: string) {
-  return asyncHandler(async (request: Request, _response: Response, next: NextFunction): Promise<void> => {
-    const startTime = Date.now();
+  return asyncHandler(
+    async (request: Request, _response: Response, next: NextFunction): Promise<void> => {
+      const startTime = Date.now();
 
-    _response.on('finish', () => {
-      const auditEntry: AuditLogEntry = {
-        tenantId: (request as any).tenantId,
-        branchId: (request as any).branchId || null,
-        userId: (request as any).userId || 'system',
-        userName: '',
-        action,
-        module,
-        recordId: generateId(),
-        recordType: module,
-        previousData: null,
-        newData: {
-          method: request.method,
-          path: request.path,
-          body: JSON.stringify(request.body),
-          statusCode: _response.statusCode,
-          duration: Date.now() - startTime,
-        },
-        ip: request.ip || request.socket?.remoteAddress || 'unknown',
-        deviceInfo: {
-          userAgent: request.get('user-agent'),
-        },
-      };
+      _response.on('finish', () => {
+        const auditEntry: AuditLogEntry = {
+          tenantId: (request as any).tenantId,
+          branchId: (request as any).branchId || null,
+          userId: (request as any).userId || 'system',
+          userName: '',
+          action,
+          module,
+          recordId: generateId(),
+          recordType: module,
+          previousData: null,
+          newData: {
+            method: request.method,
+            path: request.path,
+            body: JSON.stringify(sanitizeBody(request.body)),
+            statusCode: _response.statusCode,
+            duration: Date.now() - startTime,
+          },
+          ip: request.ip || request.socket?.remoteAddress || 'unknown',
+          deviceInfo: {
+            userAgent: request.get('user-agent'),
+          },
+        };
 
-      auditQueue.push(auditEntry);
+        auditQueue.push(auditEntry);
 
-      if (auditQueue.length >= AUDIT_BATCH_SIZE) {
-        flushAuditQueue();
-      }
-    });
+        if (auditQueue.length >= AUDIT_BATCH_SIZE) {
+          flushAuditQueue();
+        }
+      });
 
-    next();
-  });
+      next();
+    },
+  );
 }
 
 export function sanitizeBody(body: unknown): unknown {
+  if (Array.isArray(body)) return body.map(sanitizeBody);
   if (!body || typeof body !== 'object') return body;
-  const sanitized = { ...body } as Record<string, unknown>;
-  delete sanitized.password;
-  delete sanitized.currentPassword;
-  delete sanitized.newPassword;
-  delete sanitized.confirmPassword;
-  delete sanitized.refreshToken;
-  return sanitized;
+
+  return Object.fromEntries(
+    Object.entries(body)
+      .filter(
+        ([key]) =>
+          !/(?:password|token|secret|credential|(?:api|private)[_-]?key|authorization|(?:admin|confirmation|verification|one.?time|otp).?code|^code$)/i.test(
+            key,
+          ),
+      )
+      .map(([key, value]) => [key, sanitizeBody(value)]),
+  );
 }

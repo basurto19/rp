@@ -11,10 +11,12 @@ import { Token } from '../../src/modules/auth/models/token.model';
 import { EmailVerificationToken } from '../../src/modules/auth/models/email-verification-token.model';
 import {
   logEmailDeliveryFailure,
+  sendAdminRegistrationNotification,
   sendWelcomeEmail,
   sendVerificationEmail,
 } from '../../src/modules/auth/services/email.service';
 import { AppError } from '../../src/modules/shared/errors/app-error';
+import { registerSchema } from '@erp/validation';
 
 jest.mock('bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('password-hash'),
@@ -71,6 +73,7 @@ jest.mock('../../src/modules/auth/models/email-verification-token.model', () => 
 }));
 
 jest.mock('../../src/modules/auth/services/email.service', () => ({
+  sendAdminRegistrationNotification: jest.fn().mockResolvedValue(undefined),
   sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
   sendWelcomeEmail: jest.fn().mockResolvedValue(undefined),
   logEmailDeliveryFailure: jest.fn(),
@@ -102,16 +105,20 @@ describe('AuthService email verification', () => {
     jest.spyOn(mongoose, 'startSession').mockResolvedValue(mockSession as never);
     (EmailVerificationToken.findOneAndUpdate as jest.Mock).mockReturnValue(query({}));
     (EmailVerificationToken.findOneAndDelete as jest.Mock).mockReturnValue(query(null));
+    (Token.create as jest.Mock).mockResolvedValue({});
+    (User.findByIdAndUpdate as jest.Mock).mockReturnValue(query({}));
     (sendVerificationEmail as jest.Mock).mockResolvedValue(undefined);
+    (sendAdminRegistrationNotification as jest.Mock).mockResolvedValue(undefined);
     (sendWelcomeEmail as jest.Mock).mockResolvedValue(undefined);
     (User.findOneAndUpdate as jest.Mock).mockReturnValue(query(null));
+    env.adminEmail = 'owner@example.com';
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
-  it('registers an unverified user and returns no session tokens', async () => {
+  it('registers a USER that can log in immediately without sending verification', async () => {
     (User.findOne as jest.Mock).mockReturnValue({
       session: jest.fn().mockReturnValue(query(null)),
     });
@@ -123,45 +130,44 @@ describe('AuthService email verification', () => {
       password: 'password123',
       companyName: 'Empresa',
     });
+    await waitForBackgroundEmail();
 
     expect((User as unknown as jest.Mock).mock.instances[0]).toMatchObject({
       email: 'ana@example.com',
+      roleId: 'user',
+      isPrimaryAdmin: false,
+      firstName: 'Ana',
       emailVerified: false,
       emailVerifiedAt: null,
+    });
+    expect((Role as unknown as jest.Mock).mock.instances[0]).toMatchObject({
+      roleId: 'user',
+      permissions: [],
     });
     expect(result).not.toHaveProperty('accessToken');
     expect(result).not.toHaveProperty('refreshToken');
     expect(Token.create).not.toHaveBeenCalled();
     expect(sendWelcomeEmail).not.toHaveBeenCalled();
-    expect(sendVerificationEmail).toHaveBeenCalledWith(
+    expect(sendVerificationEmail).not.toHaveBeenCalled();
+    expect(EmailVerificationToken.findOneAndUpdate).not.toHaveBeenCalled();
+    expect(sendAdminRegistrationNotification).toHaveBeenCalledWith(
       expect.objectContaining({
-        email: 'ana@example.com',
+        to: 'owner@example.com',
         firstName: 'Ana',
-        token: expect.any(String),
+        lastName: 'Pérez',
+        email: 'ana@example.com',
+        companyName: 'Empresa',
+        registeredAt: expect.any(Date),
       }),
-    );
-    const sentToken = (sendVerificationEmail as jest.Mock).mock.calls[0][0].token;
-    const storedToken = (EmailVerificationToken.findOneAndUpdate as jest.Mock).mock.calls[0][1];
-    expect(sentToken).toMatch(/^[a-f0-9]{64}$/);
-    expect(storedToken.expiresAt.getTime()).toBeGreaterThan(Date.now() + 23 * 60 * 60 * 1000);
-    expect(EmailVerificationToken.findOneAndUpdate).toHaveBeenCalledWith(
-      { userId: 'test-user-id' },
-      expect.objectContaining({ tokenHash: verificationHash(sentToken) }),
-      expect.any(Object),
-    );
-    expect(EmailVerificationToken.findOneAndUpdate).not.toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ tokenHash: sentToken }),
-      expect.anything(),
     );
   });
 
-  it('keeps the created account when email delivery fails so it can be resent', async () => {
+  it('keeps the account when administrator notification delivery fails', async () => {
     (User.findOne as jest.Mock).mockReturnValue({
       session: jest.fn().mockReturnValue(query(null)),
     });
-    (sendVerificationEmail as jest.Mock).mockRejectedValueOnce(
-      Object.assign(new Error('SMTP unavailable'), { code: 'ETIMEDOUT' }),
+    (sendAdminRegistrationNotification as jest.Mock).mockRejectedValueOnce(
+      Object.assign(new Error('private provider response'), { statusCode: 503 }),
     );
 
     await expect(
@@ -172,33 +178,101 @@ describe('AuthService email verification', () => {
         password: 'password123',
         companyName: 'Empresa',
       }),
-    ).rejects.toMatchObject({ code: 'EMAIL_DELIVERY_FAILED' });
+    ).resolves.toMatchObject({ message: 'Cuenta creada correctamente. Ya puedes iniciar sesión.' });
+    await waitForBackgroundEmail();
 
     expect((User as unknown as jest.Mock).mock.instances[0]).toMatchObject({
       email: 'ana@example.com',
-      emailVerified: false,
+      roleId: 'user',
     });
-    expect(EmailVerificationToken.findOneAndUpdate).toHaveBeenCalledTimes(1);
+    expect(EmailVerificationToken.findOneAndUpdate).not.toHaveBeenCalled();
     expect(Token.create).not.toHaveBeenCalled();
-    expect(logEmailDeliveryFailure).toHaveBeenCalledWith(expect.any(Error), 'registration');
+    expect(logEmailDeliveryFailure).toHaveBeenCalledWith(expect.any(Error), 'admin_registration');
   });
 
-  it('rejects valid-credential login until a new account verifies its email', async () => {
-    (User.findOne as jest.Mock).mockReturnValue(
-      query({
-        _id: 'unverified-user',
-        emailVerified: false,
-        status: 'active',
-        passwordHash: 'password-hash',
-      }),
-    );
+  it('allows an unverified legacy user to log in and attempts the first-login welcome email', async () => {
+    const unverifiedUser = {
+      _id: 'unverified-user',
+      tenantId: 'legacy-tenant',
+      email: 'user@example.com',
+      firstName: 'Ana',
+      emailVerified: false,
+      status: 'active',
+      passwordHash: 'password-hash',
+      roleId: 'admin',
+      branchId: null,
+    };
+    (User.findOne as jest.Mock).mockReturnValue(query(unverifiedUser));
+    (User.findOneAndUpdate as jest.Mock)
+      .mockReturnValueOnce(query(unverifiedUser))
+      .mockReturnValueOnce(query(unverifiedUser));
 
-    await expect(authService.login('user@example.com', 'correct-password')).rejects.toMatchObject({
-      code: 'EMAIL_NOT_VERIFIED',
+    const result = await authService.login('user@example.com', 'correct-password');
+    await waitForBackgroundEmail();
+
+    expect(result.user).toMatchObject({ roleId: 'user', permissions: [] });
+    expect(result).toHaveProperty('accessToken');
+    expect(Token.create).toHaveBeenCalledTimes(1);
+    expect(sendVerificationEmail).not.toHaveBeenCalled();
+    expect(sendWelcomeEmail).toHaveBeenCalledWith({
+      email: 'user@example.com',
+      firstName: 'Ana',
     });
-    expect(Token.create).not.toHaveBeenCalled();
-    expect(sendWelcomeEmail).not.toHaveBeenCalled();
-    expect(User.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it('disables password recovery until a secure email-bound flow is implemented', async () => {
+    await expect(authService.forgotPassword('user@example.com', 'tenant-1')).rejects.toMatchObject({
+      code: 'PASSWORD_RECOVERY_UNAVAILABLE',
+      statusCode: 501,
+    });
+
+    expect(User.findOne).not.toHaveBeenCalled();
+  });
+
+  it('strips manipulated role and permission fields from public registration input', () => {
+    const parsed = registerSchema.parse({
+      firstName: 'Ana',
+      lastName: 'Pérez',
+      email: 'ana@example.com',
+      password: 'password123',
+      companyName: 'Empresa',
+      role: 'admin',
+      roleId: 'super_admin',
+      isAdmin: true,
+      permissions: ['*'],
+    });
+
+    expect(parsed).not.toHaveProperty('role');
+    expect(parsed).not.toHaveProperty('roleId');
+    expect(parsed).not.toHaveProperty('isAdmin');
+    expect(parsed).not.toHaveProperty('permissions');
+  });
+
+  it('allows public ADMIN_EMAIL registration only as an unverified USER without admin privileges', async () => {
+    (User.findOne as jest.Mock).mockReturnValue({
+      session: jest.fn().mockReturnValue(query(null)),
+    });
+
+    await expect(
+      authService.register({
+        firstName: 'Owner',
+        lastName: 'Admin',
+        email: ' OWNER@EXAMPLE.COM ',
+        password: 'password123',
+        companyName: 'Empresa',
+      }),
+    ).resolves.toMatchObject({
+      message: 'Cuenta creada correctamente. Ya puedes iniciar sesión.',
+    });
+
+    expect((User as unknown as jest.Mock).mock.instances[0]).toMatchObject({
+      email: 'owner@example.com',
+      roleId: 'user',
+      isPrimaryAdmin: false,
+      emailVerified: false,
+      emailVerifiedAt: null,
+    });
+    expect(mongoose.startSession).toHaveBeenCalledTimes(1);
   });
 
   it('verifies a valid token using its hash and expiry condition', async () => {
@@ -530,6 +604,10 @@ describe('AuthService email verification', () => {
       }),
       expect.objectContaining({ upsert: true }),
     );
+    expect(User.findOne).toHaveBeenCalledWith({
+      email: 'user@example.com',
+      $or: [{ emailVerified: false }, { emailVerified: { $exists: false } }],
+    });
     const sentToken = (sendVerificationEmail as jest.Mock).mock.calls[0][0].token;
     const replacementHash = (EmailVerificationToken.findOneAndUpdate as jest.Mock).mock.calls[0][1]
       .tokenHash;
@@ -551,6 +629,10 @@ describe('AuthService email verification', () => {
     const knownResponse = await authService.resendVerification('known@example.com');
 
     expect(unknownResponse).toEqual(knownResponse);
+    expect(User.findOne).toHaveBeenNthCalledWith(2, {
+      email: 'known@example.com',
+      $or: [{ emailVerified: false }, { emailVerified: { $exists: false } }],
+    });
     expect(sendVerificationEmail).toHaveBeenCalledTimes(1);
   });
 

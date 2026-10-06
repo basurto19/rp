@@ -13,8 +13,14 @@ export class AuditService {
     return logEntry.save();
   }
 
-  async getByTenant(tenantId: string, filter: Record<string, unknown> = {}, page: number = 1, limit: number = 20) {
-    const combinedFilter = { tenantId, ...filter };
+  async getByTenant(
+    tenantId: string,
+    filter: Record<string, unknown> = {},
+    page: number = 1,
+    limit: number = 20,
+    acrossTenants = false,
+  ) {
+    const combinedFilter = { ...(acrossTenants ? {} : { tenantId }), ...filter };
     const [total, data] = await Promise.all([
       AuditLog.countDocuments(combinedFilter).exec(),
       AuditLog.find(combinedFilter as Record<string, unknown>)
@@ -26,8 +32,20 @@ export class AuditService {
     return { data, total, page, limit, hasMore: page * limit < total };
   }
 
-  async getByModule(tenantId: string, module: string, page?: number, limit?: number) {
-    const result = await this.getByTenant(tenantId, { module }, page || 1, limit || 20);
+  async getByModule(
+    tenantId: string,
+    module: string,
+    page?: number,
+    limit?: number,
+    acrossTenants = false,
+  ) {
+    const result = await this.getByTenant(
+      tenantId,
+      { module },
+      page || 1,
+      limit || 20,
+      acrossTenants,
+    );
     return result;
   }
 }

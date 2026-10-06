@@ -11,6 +11,7 @@
     "test:unit": "jest tests/unit --config ../../jest.config.js --verbose",
     "test:integration": "jest tests/integration --config ../../jest.config.js --verbose",
     "test:all": "jest --config ../../jest.config.js --verbose",
+    "admin:bootstrap": "tsx src/scripts/bootstrap-admin.ts",
     "lint": "eslint src"
   },
   "dependencies": {

@@ -1,5 +1,7 @@
 import { env } from '../../src/config/env';
 import {
+  sendAdminBootstrapCode,
+  sendAdminRegistrationNotification,
   logEmailDeliveryFailure,
   sendWelcomeEmail,
   sendVerificationEmail,
@@ -139,6 +141,86 @@ describe('sendWelcomeEmail', () => {
     env.frontendUrl = 'https://erp.example.test';
   });
 
+  describe('administrator email notifications', () => {
+    let fetchMock: jest.SpyInstance;
+
+    beforeEach(() => {
+      fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        status: 200,
+      } as Response);
+      env.resendApiKey = 'test-key';
+      env.emailFrom = 'erp@example.test';
+    });
+
+    afterEach(() => {
+      fetchMock.mockRestore();
+    });
+
+    it('sends only approved new-user details to the configured administrator', async () => {
+      await sendAdminRegistrationNotification({
+        to: 'owner@example.test',
+        firstName: 'Ana',
+        lastName: 'Pérez',
+        email: 'ana@example.test',
+        companyName: 'Empresa',
+        registeredAt: new Date('2026-10-06T10:00:00.000Z'),
+      });
+
+      const message = JSON.parse(fetchMock.mock.calls[0][1].body as string) as {
+        to: string;
+        subject: string;
+        text: string;
+        html: string;
+      };
+      expect(message).toMatchObject({
+        to: 'owner@example.test',
+        subject: 'Nuevo usuario registrado en Apta Digital',
+      });
+      expect(Object.keys(message).sort()).toEqual(['from', 'html', 'subject', 'text', 'to']);
+      for (const detail of [
+        'Ana',
+        'Pérez',
+        'ana@example.test',
+        'Empresa',
+        '2026-10-06T10:00:00.000Z',
+      ]) {
+        expect(message.text).toContain(detail);
+        expect(message.html).toContain(detail);
+      }
+      const notificationContent = `${message.text}\n${message.html}`.toLowerCase();
+      for (const forbiddenValue of [
+        'password',
+        'contraseña',
+        'passwordhash',
+        'accesstoken',
+        'refreshtoken',
+        'jwt',
+        'api key',
+        'apikey',
+        'bootstrap code',
+        'verification token',
+        'token de verificación',
+      ]) {
+        expect(notificationContent).not.toContain(forbiddenValue);
+      }
+    });
+
+    it('keeps administrator bootstrap confirmation codes in the email body only', async () => {
+      await sendAdminBootstrapCode({ to: 'owner@example.test', code: '428193' });
+
+      const message = JSON.parse(fetchMock.mock.calls[0][1].body as string) as {
+        to: string;
+        text: string;
+        html: string;
+      };
+      expect(message.to).toBe('owner@example.test');
+      expect(message.text).toContain('428193');
+      expect(message.html).toContain('428193');
+      expect(fetchMock.mock.calls[0][1].headers.Authorization).toContain(env.resendApiKey);
+    });
+  });
+
   afterEach(() => {
     fetchMock.mockRestore();
   });
@@ -156,11 +238,22 @@ describe('sendWelcomeEmail', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(message).toMatchObject({
       to: 'ana@example.test',
-      subject: 'Bienvenido a ERP',
+      subject: 'Bienvenido a Apta Digital',
     });
+    expect(message.text).toContain('¡Bienvenido a Apta Digital!');
+    expect(message.text).toContain(
+      'Desde Apta Digital podrás gestionar de forma centralizada las diferentes áreas de tu empresa.',
+    );
+    expect(message.text).toContain('Gracias por utilizar Apta Digital.');
     expect(message.text).toContain('Hola, <Ana>.');
     expect(message.text).toContain('https://erp.example.test/');
+    expect(message.html).toContain('¡Bienvenido a Apta Digital!');
     expect(message.html).toContain('Hola, &lt;Ana&gt;.');
+    expect(message.html).toContain(
+      'Desde Apta Digital podrás gestionar de forma centralizada las diferentes áreas de tu empresa.',
+    );
+    expect(message.html).toContain('Gracias por utilizar Apta Digital.');
+    expect(message.html).toContain('Acceder al sistema');
     expect(message.html).toContain('href="https://erp.example.test/"');
     expect(message.html).not.toContain('Hola, <Ana>.');
   });

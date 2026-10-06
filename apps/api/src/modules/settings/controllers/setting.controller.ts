@@ -12,14 +12,24 @@ export class SettingController {
 
   async getAll(request: Request, response: Response): Promise<Response> {
     const tenantId = (request as any).tenantId;
-    const settings = await this.service.getAll(tenantId);
+    const settings = await this.service.getAll(
+      tenantId,
+      undefined,
+      undefined,
+      (request as any).isPrimaryAdmin === true,
+    );
     return successResponse(response, settings);
   }
 
   async getByKey(request: Request, response: Response): Promise<Response> {
     const { key } = request.params;
     const tenantId = (request as any).tenantId;
-    const setting = await this.service.getByKey(key as string, tenantId);
+    const setting = await this.service.getByKey(
+      key as string,
+      typeof request.query.tenantId === 'string' && (request as any).isPrimaryAdmin === true
+        ? request.query.tenantId
+        : tenantId,
+    );
     return successResponse(response, setting);
   }
 
@@ -28,7 +38,18 @@ export class SettingController {
     const { value, type, description } = request.body;
     const tenantId = (request as any).tenantId;
     try {
-      const setting = await this.service.upsert(tenantId as string, key as string, value, type || 'string', description || '');
+      const isPrimaryAdmin = (request as any).isPrimaryAdmin === true;
+      const targetTenantId =
+        isPrimaryAdmin && typeof request.body.tenantId === 'string'
+          ? request.body.tenantId
+          : (tenantId as string);
+      const setting = await this.service.upsert(
+        targetTenantId,
+        key as string,
+        value,
+        type || 'string',
+        description || '',
+      );
       return successResponse(response, setting, 201, 'Configuración actualizada');
     } catch (err) {
       if (err instanceof AppError) return errorResponse(response, err);
@@ -39,7 +60,11 @@ export class SettingController {
   async delete(request: Request, response: Response): Promise<Response> {
     const { key } = request.params;
     const tenantId = (request as any).tenantId;
-    await this.service.delete(key as string, tenantId as string);
+    const targetTenantId =
+      (request as any).isPrimaryAdmin === true && typeof request.query.tenantId === 'string'
+        ? request.query.tenantId
+        : (tenantId as string);
+    await this.service.delete(key as string, targetTenantId);
     return successResponse(response, { deleted: true }, 200, 'Configuración eliminada');
   }
 }

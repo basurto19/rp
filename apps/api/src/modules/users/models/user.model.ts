@@ -9,11 +9,13 @@ export interface IUser {
   firstName: string;
   lastName: string;
   roleId: string;
+  isPrimaryAdmin?: boolean;
   status: string;
   emailVerified: boolean;
   emailVerifiedAt: Date | null;
   welcomeEmailSentAt?: Date | null;
   welcomeEmailSendingAt?: Date | null;
+  createdAt?: Date;
   refreshToken: string | null;
   refreshTokenExpiry: Date | null;
   lastLoginAt: Date | null;
@@ -28,8 +30,9 @@ const userSchema = new Schema<IUser>(
     firstName: { type: String, required: true, maxlength: 100 },
     lastName: { type: String, required: true, maxlength: 100 },
     roleId: { type: String, required: true },
+    isPrimaryAdmin: { type: Boolean, default: false },
     status: { type: String, enum: ['active', 'inactive', 'locked'], default: 'active' },
-    emailVerified: { type: Boolean, default: true },
+    emailVerified: { type: Boolean, default: false },
     emailVerifiedAt: { type: Date, default: null },
     welcomeEmailSentAt: { type: Date, default: null },
     welcomeEmailSendingAt: { type: Date, default: null },
@@ -43,5 +46,9 @@ const userSchema = new Schema<IUser>(
 userSchema.index({ tenantId: 1, email: 1 });
 userSchema.index({ branchId: 1 });
 userSchema.index({ roleId: 1 });
+userSchema.index(
+  { isPrimaryAdmin: 1 },
+  { unique: true, partialFilterExpression: { isPrimaryAdmin: true } },
+);
 
 export const User = model<IUser>('User', userSchema);

@@ -2,6 +2,7 @@
 import { User } from '../models/user.model';
 import { BaseRepository } from '../../shared/repositories/base-repository';
 import { AppError } from '../../shared/errors/app-error';
+import { ROLES } from '@erp/constants';
 
 export class UserService {
   private repository: BaseRepository<any>;
@@ -10,12 +11,19 @@ export class UserService {
     this.repository = new BaseRepository(User as any);
   }
 
-  async getAll(tenantId: string, branchId: string | null, filter: Record<string, unknown> = {}, page?: number, limit?: number) {
-    return this.repository.findAll(tenantId, branchId, filter, { page, limit });
+  async getAll(
+    tenantId: string,
+    branchId: string | null,
+    filter: Record<string, unknown> = {},
+    page?: number,
+    limit?: number,
+    acrossTenants = false,
+  ) {
+    return this.repository.findAll(tenantId, branchId, filter, { page, limit }, acrossTenants);
   }
 
-  async getById(id: string, tenantId: string) {
-    const user = await this.repository.findById(id, tenantId);
+  async getById(id: string, tenantId: string, acrossTenants = false) {
+    const user = await this.repository.findById(id, tenantId, acrossTenants);
     if (!user) throw new AppError('RESOURCE_NOT_FOUND', 'Usuario no encontrado', 404);
     return user;
   }
@@ -25,13 +33,39 @@ export class UserService {
   }
 
   async create(data: Record<string, unknown>) {
-    const existing = await User.findOne({ tenantId: data.tenantId, email: data.email }).exec();
-    if (existing) throw new AppError('DUPLICATE_RESOURCE', 'Ya existe un usuario con ese email', 409);
-    return this.repository.create(data as any);
+    const normalizedData = { ...data };
+    if (typeof normalizedData.email === 'string') {
+      normalizedData.email = normalizedData.email.trim().toLowerCase();
+    }
+    const existing = await User.findOne({ email: normalizedData.email }).exec();
+    if (existing)
+      throw new AppError('DUPLICATE_RESOURCE', 'Ya existe un usuario con ese email', 409);
+    return this.repository.create({
+      ...normalizedData,
+      roleId: ROLES.USER,
+      isPrimaryAdmin: false,
+      emailVerified: false,
+      emailVerifiedAt: null,
+    } as any);
   }
 
-  async update(id: string, tenantId: string, updateData: Record<string, unknown>) {
-    const user = await this.repository.updateById(id, tenantId, updateData);
+  async update(
+    id: string,
+    tenantId: string,
+    updateData: Record<string, unknown>,
+    acrossTenants = false,
+  ) {
+    const existingUser = await this.repository.findById(id, tenantId, acrossTenants);
+    if (!existingUser) throw new AppError('RESOURCE_NOT_FOUND', 'Usuario no encontrado', 404);
+    if (existingUser.isPrimaryAdmin === true) {
+      if (updateData.status === 'locked') {
+        throw new AppError('FORBIDDEN', 'No se puede bloquear al administrador principal.', 403);
+      }
+      delete updateData.roleId;
+    } else {
+      updateData.roleId = ROLES.USER;
+    }
+    const user = await this.repository.updateById(id, tenantId, updateData, acrossTenants);
     if (!user) throw new AppError('RESOURCE_NOT_FOUND', 'Usuario no encontrado', 404);
     return user;
   }
@@ -40,8 +74,12 @@ export class UserService {
     return this.repository.updateById(id, tenantId, { passwordHash: newPasswordHash });
   }
 
-  async delete(id: string, tenantId: string) {
-    const deleted = await this.repository.deleteById(id, tenantId);
+  async delete(id: string, tenantId: string, acrossTenants = false) {
+    const existingUser = await this.repository.findById(id, tenantId, acrossTenants);
+    if (existingUser?.isPrimaryAdmin === true) {
+      throw new AppError('FORBIDDEN', 'No se puede eliminar al administrador principal.', 403);
+    }
+    const deleted = await this.repository.deleteById(id, tenantId, acrossTenants);
     if (!deleted) throw new AppError('RESOURCE_NOT_FOUND', 'Usuario no encontrado', 404);
     return { deleted: true };
   }

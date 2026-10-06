@@ -38,6 +38,7 @@ export const env = {
   resendApiKey: process.env.RESEND_API_KEY ?? '',
   emailFrom: process.env.EMAIL_FROM ?? '',
   frontendUrl: process.env.FRONTEND_URL ?? '',
+  adminEmail: (process.env.ADMIN_EMAIL ?? '').trim().toLowerCase(),
   rateLimitMax: parseNumber('RATE_LIMIT_MAX', 100),
   rateLimitWindowMs: parseNumber('RATE_LIMIT_WINDOW_MS', 900000),
 };

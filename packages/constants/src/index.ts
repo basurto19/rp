@@ -13,6 +13,7 @@ export const APP_CONFIG = {
 } as const;
 
 export const ROLES = {
+  USER: 'user',
   SUPER_ADMIN: 'super_admin',
   ADMIN: 'admin',
   SELLER: 'seller',

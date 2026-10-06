@@ -11,13 +11,10 @@ interface TenantAwareRequest extends Request {
   userId: string;
   userRole: string;
   userPermissions: Array<{ module: string; actions: Record<string, boolean> }>;
+  isPrimaryAdmin: boolean;
 }
 
-export function authenticateToken(
-  request: Request,
-  _response: Response,
-  next: NextFunction,
-): void {
+export function authenticateToken(request: Request, _response: Response, next: NextFunction): void {
   const authHeader = request.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -29,12 +26,19 @@ export function authenticateToken(
 
   try {
     const decoded = jwt.verify(token, env.jwtSecret) as jwt.JwtPayload;
+    if (decoded.purpose !== undefined) {
+      throw new AppError('INVALID_TOKEN', 'Token de acceso inválido', 401);
+    }
 
     (request as TenantAwareRequest).userId = decoded.userId;
     (request as TenantAwareRequest).tenantId = decoded.tenantId;
     (request as TenantAwareRequest).branchId = decoded.branchId || null;
-    (request as TenantAwareRequest).userRole = decoded.roleId;
-    (request as TenantAwareRequest).userPermissions = decoded.permissions || [];
+    const isPrimaryAdmin = decoded.isPrimaryAdmin === true;
+    (request as TenantAwareRequest).isPrimaryAdmin = isPrimaryAdmin;
+    (request as TenantAwareRequest).userRole = isPrimaryAdmin ? 'super_admin' : 'user';
+    (request as TenantAwareRequest).userPermissions = isPrimaryAdmin
+      ? decoded.permissions || []
+      : [];
 
     next();
   } catch (error) {
@@ -64,7 +68,9 @@ export function authenticateRefreshToken(
     (request as TenantAwareRequest).userId = decoded.userId;
     (request as TenantAwareRequest).tenantId = decoded.tenantId;
     (request as TenantAwareRequest).branchId = decoded.branchId || null;
-    (request as TenantAwareRequest).userRole = decoded.roleId;
+    (request as TenantAwareRequest).isPrimaryAdmin = decoded.isPrimaryAdmin === true;
+    (request as TenantAwareRequest).userRole =
+      decoded.isPrimaryAdmin === true ? 'super_admin' : 'user';
 
     next();
   } catch {

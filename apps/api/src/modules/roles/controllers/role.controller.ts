@@ -12,14 +12,18 @@ export class RoleController {
 
   async getAll(request: Request, response: Response): Promise<Response> {
     const tenantId = (request as any).tenantId;
-    const result = await this.service.getAll(tenantId);
+    const result = await this.service.getAll(tenantId, (request as any).isPrimaryAdmin === true);
     return successResponse(response, result);
   }
 
   async getById(request: Request, response: Response): Promise<Response> {
     const { id } = request.params;
     const tenantId = (request as any).tenantId;
-    const role = await this.service.getById(id as string, tenantId);
+    const role = await this.service.getById(
+      id as string,
+      tenantId,
+      (request as any).isPrimaryAdmin === true,
+    );
     return successResponse(response, role);
   }
 
@@ -27,7 +31,11 @@ export class RoleController {
     const body = request.body;
     const tenantId = (request as any).tenantId;
     try {
-      const role = await this.service.create({ ...body, tenantId });
+      const targetTenantId =
+        (request as any).isPrimaryAdmin === true && typeof body.tenantId === 'string'
+          ? body.tenantId
+          : tenantId;
+      const role = await this.service.create({ ...body, tenantId: targetTenantId });
       return successResponse(response, role, 201, 'Rol creado');
     } catch (err) {
       if (err instanceof AppError) return errorResponse(response, err);
@@ -39,14 +47,19 @@ export class RoleController {
     const { id } = request.params;
     const body = request.body;
     const tenantId = (request as any).tenantId;
-    const role = await this.service.update(id as string, tenantId, body);
+    const role = await this.service.update(
+      id as string,
+      tenantId,
+      body,
+      (request as any).isPrimaryAdmin === true,
+    );
     return successResponse(response, role);
   }
 
   async delete(request: Request, response: Response): Promise<Response> {
     const { id } = request.params;
     const tenantId = (request as any).tenantId;
-    await this.service.delete(id as string, tenantId);
+    await this.service.delete(id as string, tenantId, (request as any).isPrimaryAdmin === true);
     return successResponse(response, { deleted: true }, 200, 'Rol eliminado');
   }
 }
