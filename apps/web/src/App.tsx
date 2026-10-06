@@ -874,10 +874,6 @@ function App() {
     ),
   );
 
-  if (Boolean(session)) {
-    return <ProductsWorkspace session={session!} onLogout={handleLogout} />;
-  }
-
   if (!session) {
     return (
       <View className="login-page">
@@ -1146,6 +1142,18 @@ function App() {
           </Pressable>
         </View>
         <View className="nav-section">
+          <Text className="sidebar-label">OPERACIÓN</Text>
+          <Pressable
+            className={`nav-item${activeModule === 'products' ? ' active' : ''}`}
+            onPress={() => setActiveModule('products')}
+            accessibilityRole="button"
+            accessibilityState={{ selected: activeModule === 'products' }}
+          >
+            <Text className="nav-item-text">Productos</Text>
+            <Text className="nav-access">100</Text>
+          </Pressable>
+        </View>
+        <View className="nav-section">
           <Text className="sidebar-label">ADMINISTRACIÓN</Text>
           {visibleModules
             .filter((module) => ['users', 'companies', 'branches', 'roles'].includes(module.id))
@@ -1211,8 +1219,11 @@ function App() {
           </View>
         </View>
 
+        {activeModule === 'products' ? (
+          <ProductsWorkspace session={session} onLogout={handleLogout} />
+        ) : (
         <View className="workspace-main">
-          {guardedModule === 'dashboard' ? (
+          {activeModule === 'dashboard' ? (
             <>
               <View className="page-heading">
                 <View>
@@ -1439,6 +1450,7 @@ function App() {
             </>
           ) : null}
         </View>
+        )}
         {isChangePasswordOpen ? (
           <div
             className="dialog-backdrop"
