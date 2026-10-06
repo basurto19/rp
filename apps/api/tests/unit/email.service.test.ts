@@ -1,6 +1,7 @@
 import { env } from '../../src/config/env';
 import {
   logEmailDeliveryFailure,
+  sendWelcomeEmail,
   sendVerificationEmail,
 } from '../../src/modules/auth/services/email.service';
 
@@ -88,10 +89,10 @@ describe('sendVerificationEmail', () => {
       { statusCode: 401 },
     );
 
-    logEmailDeliveryFailure(failure, 'registration');
+    logEmailDeliveryFailure(failure, 'welcome');
 
     expect(log).toHaveBeenCalledWith('Email provider delivery failed', {
-      context: 'registration',
+      context: 'welcome',
       category: 'authentication_rejected',
       statusCode: 401,
     });
@@ -122,5 +123,45 @@ describe('sendVerificationEmail', () => {
       sendVerificationEmail({ email: 'ana@example.test', firstName: 'Ana', token: 'token' }),
     ).rejects.toThrow('Resend email delivery is not configured');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('sendWelcomeEmail', () => {
+  let fetchMock: jest.SpyInstance;
+
+  beforeEach(() => {
+    fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+    } as Response);
+    env.resendApiKey = 'test-key';
+    env.emailFrom = 'erp@example.test';
+    env.frontendUrl = 'https://erp.example.test';
+  });
+
+  afterEach(() => {
+    fetchMock.mockRestore();
+  });
+
+  it('sends a safe welcome email with HTML and plain-text versions through Resend', async () => {
+    await sendWelcomeEmail({ email: 'ana@example.test', firstName: '<Ana>' });
+
+    const [, request] = fetchMock.mock.calls[0];
+    const message = JSON.parse(request.body as string) as {
+      to: string;
+      subject: string;
+      text: string;
+      html: string;
+    };
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(message).toMatchObject({
+      to: 'ana@example.test',
+      subject: 'Bienvenido a ERP',
+    });
+    expect(message.text).toContain('Hola, <Ana>.');
+    expect(message.text).toContain('https://erp.example.test/');
+    expect(message.html).toContain('Hola, &lt;Ana&gt;.');
+    expect(message.html).toContain('href="https://erp.example.test/"');
+    expect(message.html).not.toContain('Hola, <Ana>.');
   });
 });

@@ -7,7 +7,7 @@ import { Company } from '../../companies/models/company.model';
 import { Role } from '../../roles/models/role.model';
 import { Token } from '../models/token.model';
 import { EmailVerificationToken } from '../models/email-verification-token.model';
-import { logEmailDeliveryFailure, sendVerificationEmail } from './email.service';
+import { logEmailDeliveryFailure, sendVerificationEmail, sendWelcomeEmail } from './email.service';
 import { AppError } from '../../shared/errors/app-error';
 import { env } from '../../../config/env';
 import { generateTenantId } from '../../shared/utils';
@@ -22,7 +22,9 @@ interface RegisterInput {
 }
 
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
-const RESEND_VERIFICATION_MESSAGE = 'Si la cuenta existe y aún no está verificada, enviaremos un correo de verificación.';
+const WELCOME_EMAIL_CLAIM_TTL_MS = 60 * 1000;
+const RESEND_VERIFICATION_MESSAGE =
+  'Si la cuenta existe y aún no está verificada, enviaremos un correo de verificación.';
 
 function hashVerificationToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
@@ -137,6 +139,12 @@ export class AuthService {
     });
     await User.findByIdAndUpdate(user._id, { lastLoginAt: new Date() }).exec();
 
+    if (!user.welcomeEmailSentAt) {
+      void this.deliverWelcomeEmail(user._id.toString()).catch(() =>
+        this.logWelcomeEmailStateFailure(),
+      );
+    }
+
     return {
       accessToken,
       refreshToken,
@@ -152,7 +160,11 @@ export class AuthService {
     }).exec();
 
     if (!verification) {
-      throw new AppError('INVALID_VERIFICATION_TOKEN', 'El enlace de verificación no es válido o ha expirado.', 400);
+      throw new AppError(
+        'INVALID_VERIFICATION_TOKEN',
+        'El enlace de verificación no es válido o ha expirado.',
+        400,
+      );
     }
 
     const user = await User.findByIdAndUpdate(
@@ -161,7 +173,11 @@ export class AuthService {
       { new: true },
     ).exec();
     if (!user) {
-      throw new AppError('INVALID_VERIFICATION_TOKEN', 'El enlace de verificación no es válido o ha expirado.', 400);
+      throw new AppError(
+        'INVALID_VERIFICATION_TOKEN',
+        'El enlace de verificación no es válido o ha expirado.',
+        400,
+      );
     }
 
     return { message: 'Correo verificado correctamente.' };
@@ -183,14 +199,18 @@ export class AuthService {
 
   async refreshToken(refreshTokenStr: string) {
     const decoded = jwt.verify(refreshTokenStr, env.jwtRefreshSecret) as any;
-    const tokenRecord = await Token.findOne({ refreshToken: refreshTokenStr, revoked: false }).exec();
+    const tokenRecord = await Token.findOne({
+      refreshToken: refreshTokenStr,
+      revoked: false,
+    }).exec();
     if (!tokenRecord) throw new AppError('INVALID_TOKEN', 'Token de refresco inválido', 401);
     if (tokenRecord.expiresAt < new Date()) {
       await tokenRecord.deleteOne().exec();
       throw new AppError('TOKEN_EXPIRED', 'Token de refresco expirado', 401);
     }
     const user = await User.findById(decoded.userId).exec();
-    if (!user || user.status === 'locked') throw new AppError('USER_NOT_FOUND', 'Usuario no encontrado', 404);
+    if (!user || user.status === 'locked')
+      throw new AppError('USER_NOT_FOUND', 'Usuario no encontrado', 404);
     if (user.emailVerified === false) {
       await Token.findOneAndUpdate({ refreshToken: refreshTokenStr }, { revoked: true }).exec();
       throw new AppError('EMAIL_NOT_VERIFIED', 'Verifica tu correo antes de iniciar sesión.', 403);
@@ -201,7 +221,10 @@ export class AuthService {
   }
 
   async logout(refreshTokenStr: string, userId: string) {
-    await Token.findOneAndUpdate({ refreshToken: refreshTokenStr, userId }, { revoked: true }).exec();
+    await Token.findOneAndUpdate(
+      { refreshToken: refreshTokenStr, userId },
+      { revoked: true },
+    ).exec();
     return { success: true };
   }
 
@@ -247,21 +270,85 @@ export class AuthService {
     return token;
   }
 
+  private async deliverWelcomeEmail(userId: string): Promise<void> {
+    const claimTime = new Date();
+    const claimedUser = await User.findOneAndUpdate(
+      {
+        _id: userId,
+        welcomeEmailSentAt: null,
+        $or: [
+          { welcomeEmailSendingAt: null },
+          {
+            welcomeEmailSendingAt: {
+              $lt: new Date(claimTime.getTime() - WELCOME_EMAIL_CLAIM_TTL_MS),
+            },
+          },
+        ],
+      },
+      { $set: { welcomeEmailSendingAt: claimTime } },
+      { new: true },
+    ).exec();
+    if (!claimedUser) return;
+
+    try {
+      await sendWelcomeEmail({
+        email: claimedUser.email,
+        firstName: claimedUser.firstName,
+      });
+    } catch (error: unknown) {
+      logEmailDeliveryFailure(error, 'welcome');
+      await User.findOneAndUpdate(
+        { _id: userId, welcomeEmailSendingAt: claimTime },
+        { $unset: { welcomeEmailSendingAt: 1 } },
+      ).exec();
+      return;
+    }
+
+    try {
+      const markedUser = await User.findOneAndUpdate(
+        { _id: userId, welcomeEmailSendingAt: claimTime },
+        {
+          $set: { welcomeEmailSentAt: new Date() },
+          $unset: { welcomeEmailSendingAt: 1 },
+        },
+      ).exec();
+      if (!markedUser) {
+        this.logWelcomeEmailStateFailure();
+      }
+    } catch {
+      this.logWelcomeEmailStateFailure();
+    }
+  }
+
+  private logWelcomeEmailStateFailure(): void {
+    console.error('Welcome email delivery state update failed', {
+      category: 'database_error',
+    });
+  }
+
   private generateAccessToken(user: any, permissions: unknown[] = []): string {
-    return jwt.sign({
-      userId: user._id,
-      tenantId: user.tenantId,
-      branchId: user.branchId || null,
-      roleId: user.roleId,
-      permissions,
-    }, env.jwtSecret, { expiresIn: env.jwtExpiresIn as jwt.SignOptions['expiresIn'] });
+    return jwt.sign(
+      {
+        userId: user._id,
+        tenantId: user.tenantId,
+        branchId: user.branchId || null,
+        roleId: user.roleId,
+        permissions,
+      },
+      env.jwtSecret,
+      { expiresIn: env.jwtExpiresIn as jwt.SignOptions['expiresIn'] },
+    );
   }
 
   private generateRefreshToken(user: any): string {
-    return jwt.sign({
-      userId: user._id,
-      tenantId: user.tenantId,
-    }, env.jwtRefreshSecret, { expiresIn: env.jwtRefreshExpiresIn as jwt.SignOptions['expiresIn'] });
+    return jwt.sign(
+      {
+        userId: user._id,
+        tenantId: user.tenantId,
+      },
+      env.jwtRefreshSecret,
+      { expiresIn: env.jwtRefreshExpiresIn as jwt.SignOptions['expiresIn'] },
+    );
   }
 
   private sanitizeUser(user: any, permissions: unknown[] = []) {

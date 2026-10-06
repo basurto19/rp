@@ -12,26 +12,33 @@ export interface IUser {
   status: string;
   emailVerified: boolean;
   emailVerifiedAt: Date | null;
+  welcomeEmailSentAt?: Date | null;
+  welcomeEmailSendingAt?: Date | null;
   refreshToken: string | null;
   refreshTokenExpiry: Date | null;
   lastLoginAt: Date | null;
 }
 
-const userSchema = new Schema<IUser>({
-  tenantId: { type: String, required: true, index: true },
-  branchId: { type: String, index: true },
-  email: { type: String, required: true, index: true },
-  passwordHash: { type: String, required: true },
-  firstName: { type: String, required: true, maxlength: 100 },
-  lastName: { type: String, required: true, maxlength: 100 },
-  roleId: { type: String, required: true },
-  status: { type: String, enum: ['active', 'inactive', 'locked'], default: 'active' },
-  emailVerified: { type: Boolean, default: true },
-  emailVerifiedAt: { type: Date, default: null },
-  refreshToken: { type: String },
-  refreshTokenExpiry: { type: Date },
-  lastLoginAt: { type: Date },
-}, { timestamps: true });
+const userSchema = new Schema<IUser>(
+  {
+    tenantId: { type: String, required: true, index: true },
+    branchId: { type: String, index: true },
+    email: { type: String, required: true, index: true },
+    passwordHash: { type: String, required: true },
+    firstName: { type: String, required: true, maxlength: 100 },
+    lastName: { type: String, required: true, maxlength: 100 },
+    roleId: { type: String, required: true },
+    status: { type: String, enum: ['active', 'inactive', 'locked'], default: 'active' },
+    emailVerified: { type: Boolean, default: true },
+    emailVerifiedAt: { type: Date, default: null },
+    welcomeEmailSentAt: { type: Date, default: null },
+    welcomeEmailSendingAt: { type: Date, default: null },
+    refreshToken: { type: String },
+    refreshTokenExpiry: { type: Date },
+    lastLoginAt: { type: Date },
+  },
+  { timestamps: true },
+);
 
 userSchema.index({ tenantId: 1, email: 1 });
 userSchema.index({ branchId: 1 });

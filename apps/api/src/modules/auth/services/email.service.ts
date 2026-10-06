@@ -6,6 +6,11 @@ interface VerificationEmail {
   token: string;
 }
 
+interface WelcomeEmail {
+  email: string;
+  firstName: string;
+}
+
 interface OutgoingEmail {
   to: string;
   subject: string;
@@ -99,7 +104,10 @@ function emailFailureDetails(error: unknown): {
   return { category, ...(statusCode !== undefined ? { statusCode } : {}) };
 }
 
-export function logEmailDeliveryFailure(error: unknown, context: 'registration' | 'resend'): void {
+export function logEmailDeliveryFailure(
+  error: unknown,
+  context: 'registration' | 'resend' | 'welcome',
+): void {
   console.error('Email provider delivery failed', { context, ...emailFailureDetails(error) });
 }
 
@@ -141,6 +149,52 @@ export async function sendVerificationEmail({
   await sendEmail({
     to: email,
     subject: 'Verifica tu correo para acceder al ERP',
+    text,
+    html,
+  });
+}
+
+export async function sendWelcomeEmail({ email, firstName }: WelcomeEmail): Promise<void> {
+  if (!env.frontendUrl) throw new Error('FRONTEND_URL is not configured');
+
+  const frontendUrl = new URL(env.frontendUrl).toString();
+  const safeFirstName = escapeHtml(firstName);
+  const safeFrontendUrl = escapeHtml(frontendUrl);
+  const text = [
+    `Hola, ${firstName}.`,
+    '',
+    '¡Bienvenido a ERP!',
+    '',
+    'Tu cuenta ya está lista y puedes comenzar a utilizar las herramientas disponibles en el sistema.',
+    '',
+    'Desde ERP podrás gestionar de forma centralizada las diferentes áreas de tu empresa.',
+    '',
+    'Puedes acceder al sistema desde:',
+    frontendUrl,
+    '',
+    'Gracias por utilizar ERP.',
+  ].join('\n');
+  const html = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f6f8;padding:32px 16px;font-family:Arial,sans-serif;color:#1f2937">
+  <tr><td align="center">
+    <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border-radius:8px">
+      <tr><td style="padding:40px 32px">
+        <h1 style="margin:0 0 24px;color:#022656;font-size:24px">¡Bienvenido a ERP!</h1>
+        <p>Hola, ${safeFirstName}.</p>
+        <p>Tu cuenta ya está lista y puedes comenzar a utilizar las herramientas disponibles en el sistema.</p>
+        <p>Desde ERP podrás gestionar de forma centralizada las diferentes áreas de tu empresa.</p>
+        <p style="margin:28px 0">
+          <a href="${safeFrontendUrl}" style="display:inline-block;padding:12px 20px;background:#022656;color:#ffffff;text-decoration:none;border-radius:4px">Acceder al sistema</a>
+        </p>
+        <p style="font-size:14px;color:#4b5563">Si el botón no funciona, copia este enlace en tu navegador:<br><a href="${safeFrontendUrl}" style="color:#022656">${safeFrontendUrl}</a></p>
+        <p>Gracias por utilizar ERP.</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>`;
+
+  await sendEmail({
+    to: email,
+    subject: 'Bienvenido a ERP',
     text,
     html,
   });
