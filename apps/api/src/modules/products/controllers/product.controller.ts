@@ -32,6 +32,15 @@ export class ProductController {
     return successResponse(response, await this.service.list(tenantId, search));
   }
 
+  async summaryPdf(request: Request, response: Response): Promise<Response> {
+    const tenantId = (request as AuthenticatedRequest).tenantId;
+    const pdf = await this.service.summaryPdf(tenantId);
+    response.setHeader('Content-Type', 'application/pdf');
+    response.setHeader('Content-Disposition', 'attachment; filename="resumen-productos.pdf"');
+    response.setHeader('Content-Length', String(pdf.length));
+    return response.status(200).send(pdf);
+  }
+
   async getById(request: Request, response: Response): Promise<Response> {
     const productId = String(request.params.id);
     if (!this.validateId(productId, response)) return response;

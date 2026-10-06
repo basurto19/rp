@@ -12,6 +12,7 @@
     "test:integration": "jest tests/integration --config ../../jest.config.js --verbose",
     "test:all": "jest --config ../../jest.config.js --verbose",
     "admin:bootstrap": "tsx src/scripts/bootstrap-admin.ts",
+    "seed:products": "tsx src/scripts/seed-products.ts",
     "lint": "eslint src"
   },
   "dependencies": {

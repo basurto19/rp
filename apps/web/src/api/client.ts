@@ -113,6 +113,39 @@ export async function apiRequest<T>(
   }
 }
 
+export async function apiDownload(url: string, session: Session, filename: string): Promise<void> {
+  if (!apiBaseUrl) throw new Error('Configura ERP_API_BASE_URL para conectar con la API.');
+  let currentSession = session;
+  try {
+    let response;
+    try {
+      response = await axios.request<Blob>({
+        ...requestConfig('GET', url, undefined, currentSession),
+        responseType: 'blob',
+      });
+    } catch (error: unknown) {
+      if (!axios.isAxiosError(error) || error.response?.status !== 401 || !currentSession.refreshToken) throw error;
+      const accessToken = await refreshAccessToken(currentSession.refreshToken);
+      currentSession = { ...currentSession, accessToken };
+      saveSession(currentSession);
+      response = await axios.request<Blob>({
+        ...requestConfig('GET', url, undefined, currentSession),
+        responseType: 'blob',
+      });
+    }
+    const objectUrl = URL.createObjectURL(response.data);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(objectUrl);
+  } catch (error) {
+    throw error;
+  }
+}
+
 export function apiErrorMessage(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const responseData: unknown = error.response?.data;

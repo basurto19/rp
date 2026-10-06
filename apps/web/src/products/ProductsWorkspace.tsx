@@ -5,6 +5,7 @@ import {
   updateProductSchema,
 } from '@erp/validation';
 import {
+  apiDownload,
   apiErrorMessage,
   apiRequest,
   type Session,
@@ -269,9 +270,14 @@ export function ProductsWorkspace({
             <h2>Catálogo de productos</h2>
             <p>Administra los productos y existencias de tu empresa.</p>
           </div>
-          <button type="button" className="products-primary-button" onClick={startCreate}>
-            Nuevo producto
-          </button>
+          <div className="products-row-actions">
+            <button type="button" onClick={() => void apiDownload('/products/summary.pdf', session, 'resumen-productos.pdf').catch((reason: unknown) => setError(apiErrorMessage(reason)))}>
+              Descargar resumen PDF
+            </button>
+            <button type="button" className="products-primary-button" onClick={startCreate}>
+              Nuevo producto
+            </button>
+          </div>
         </div>
 
         <div className="products-summary">

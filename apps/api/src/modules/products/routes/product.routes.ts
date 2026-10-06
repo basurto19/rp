@@ -15,6 +15,7 @@ function asyncRoute(
 
 productRoutes.use(authenticateToken, validateTenant);
 productRoutes.get('/', asyncRoute(controller.list.bind(controller)));
+productRoutes.get('/summary.pdf', asyncRoute(controller.summaryPdf.bind(controller)));
 productRoutes.post('/', asyncRoute(controller.create.bind(controller)));
 productRoutes.get('/:id', asyncRoute(controller.getById.bind(controller)));
 productRoutes.put('/:id', asyncRoute(controller.update.bind(controller)));
