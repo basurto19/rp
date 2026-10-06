@@ -644,7 +644,11 @@ function App() {
   const guardedModule = session ? guardModule(session.user, activeModule, moduleIds) : 'dashboard';
 
   useEffect(() => {
-    if (session && guardedModule !== activeModule) setActiveModule(guardedModule);
+    // Operational workspaces such as Products are available to every authenticated tenant user.
+    // Only legacy administrative modules are permission-guarded.
+    if (session && activeModule !== 'products' && guardedModule !== activeModule) {
+      setActiveModule(guardedModule);
+    }
   }, [activeModule, guardedModule, session]);
 
   useEffect(() => {
