@@ -40,7 +40,7 @@ fun GBTopBar(
                     style = MaterialTheme.typography.titleLarge,
                     color = Color.White
                 )
-                if (!subtitle.isNull_orEmpty()) {
+                if (!subtitle.isNullOrEmpty()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.Default.Business,

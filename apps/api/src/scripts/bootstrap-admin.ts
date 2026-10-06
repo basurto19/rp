@@ -3,6 +3,7 @@ import { createInterface } from 'node:readline/promises';
 import { randomInt, timingSafeEqual } from 'node:crypto';
 import { stdin, stdout } from 'node:process';
 import { env } from '../config/env';
+import { configureDns } from '../config/dns';
 import { AppError } from '../modules/shared/errors/app-error';
 import { User } from '../modules/users/models/user.model';
 import {
@@ -66,6 +67,7 @@ function askHidden(question: string): Promise<string> {
 }
 
 async function connectWithoutLoggingCredentials(): Promise<void> {
+  configureDns();
   await mongoose.connect(env.mongodbUri, {
     dbName: env.mongodbDbName,
     serverSelectionTimeoutMS: 5_000,

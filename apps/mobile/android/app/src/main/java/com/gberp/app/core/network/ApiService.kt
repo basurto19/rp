@@ -14,15 +14,24 @@ import com.gberp.app.feature.roles.model.RoleDto
 import com.gberp.app.feature.settings.model.SettingDto
 import com.gberp.app.feature.users.model.CreateUserRequest
 import com.gberp.app.feature.users.model.UserDto
+import com.gberp.app.feature.products.model.InventoryMovementDto
+import com.gberp.app.feature.products.model.InventoryMovementResult
+import com.gberp.app.feature.products.model.InventoryMovementRequest
+import com.gberp.app.feature.products.model.ProductDto
+import com.gberp.app.feature.products.model.ProductRequest
+import kotlinx.serialization.json.JsonElement
+import okhttp3.ResponseBody
 import retrofit2.Call
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.PATCH
 import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.Streaming
 
 interface ApiService {
 
@@ -41,6 +50,85 @@ interface ApiService {
 
     @PUT("auth/change-password")
     suspend fun changePassword(@Body request: ChangePasswordRequest): Response<ApiResponse<Map<String, String>>>
+
+    // --- PRODUCTS & INVENTORY ---
+    @GET("products")
+    suspend fun getProducts(@Query("search") search: String? = null): Response<ApiResponse<List<ProductDto>>>
+
+    @GET("products/{id}")
+    suspend fun getProduct(@Path("id") id: String): Response<ApiResponse<ProductDto>>
+
+    @POST("products")
+    suspend fun createProduct(@Body request: ProductRequest): Response<ApiResponse<ProductDto>>
+
+    @PUT("products/{id}")
+    suspend fun updateProduct(@Path("id") id: String, @Body request: ProductRequest): Response<ApiResponse<ProductDto>>
+
+    @PATCH("products/{id}/status")
+    suspend fun updateProductStatus(
+        @Path("id") id: String,
+        @Body body: Map<String, String>
+    ): Response<ApiResponse<ProductDto>>
+
+    @GET("products/{id}/inventory")
+    suspend fun getInventoryMovements(@Path("id") id: String): Response<ApiResponse<List<InventoryMovementDto>>>
+
+    @POST("products/{id}/inventory")
+    suspend fun createInventoryMovement(
+        @Path("id") id: String,
+        @Body request: InventoryMovementRequest
+    ): Response<ApiResponse<InventoryMovementResult>>
+
+    // --- CUSTOMERS & SALES ---
+    @GET("customers")
+    suspend fun getCustomers(
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 20,
+        @Query("search") search: String? = null
+    ): Response<ApiResponse<JsonElement>>
+
+    @GET("customers/{id}")
+    suspend fun getCustomer(@Path("id") id: String): Response<ApiResponse<JsonElement>>
+
+    @GET("customers/{id}/purchases")
+    suspend fun getCustomerPurchases(
+        @Path("id") id: String,
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 20
+    ): Response<ApiResponse<JsonElement>>
+
+    @GET("sales")
+    suspend fun getSales(
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 20,
+        @Query("search") search: String? = null,
+        @Query("status") status: String? = null,
+        @Query("paymentStatus") paymentStatus: String? = null,
+        @Query("customerId") customerId: String? = null,
+        @Query("from") from: String? = null,
+        @Query("to") to: String? = null
+    ): Response<ApiResponse<JsonElement>>
+
+    @GET("sales/{id}")
+    suspend fun getSale(@Path("id") id: String): Response<ApiResponse<JsonElement>>
+
+    @Streaming
+    @GET("reports/customers/{customerId}/purchases.pdf")
+    suspend fun customerPurchasesPdf(@Path("customerId") customerId: String): Response<ResponseBody>
+
+    @Streaming
+    @GET("reports/sales/{saleId}.pdf")
+    suspend fun salePdf(@Path("saleId") saleId: String): Response<ResponseBody>
+
+    @Streaming
+    @GET("reports/sales.pdf")
+    suspend fun salesReportPdf(
+        @Query("status") status: String? = null,
+        @Query("paymentStatus") paymentStatus: String? = null,
+        @Query("customerId") customerId: String? = null,
+        @Query("from") from: String? = null,
+        @Query("to") to: String? = null
+    ): Response<ResponseBody>
 
     // --- USERS ---
     @GET("users")

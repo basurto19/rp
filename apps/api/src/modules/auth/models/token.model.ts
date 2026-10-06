@@ -19,7 +19,6 @@ const tokenSchema = new Schema<IToken>({
 }, { timestamps: true });
 
 tokenSchema.index({ userId: 1, tenantId: 1 });
-tokenSchema.index({ refreshToken: 1 });
 tokenSchema.index({ expiresAt: 1 });
 
 export const Token = model<IToken>('Token', tokenSchema);

@@ -73,7 +73,7 @@ class SecureSessionManager @Inject constructor(
     fun getBranchId(): String? = sharedPreferences.getString(KEY_BRANCH_ID, null)
     fun getRoleId(): String? = sharedPreferences.getString(KEY_ROLE_ID, null)
 
-    fun isLoggedIn(): Boolean = !getAccessToken().isNull_orEmpty()
+    fun isLoggedIn(): Boolean = !getAccessToken().isNullOrEmpty()
 
     fun clearSession() {
         sharedPreferences.edit().clear().apply()

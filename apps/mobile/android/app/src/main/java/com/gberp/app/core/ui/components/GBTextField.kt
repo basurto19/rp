@@ -67,7 +67,7 @@ fun GBTextField(
                 errorBorderColor = GBError
             )
         )
-        if (isError && !errorMessage.isNull_orEmpty()) {
+        if (isError && !errorMessage.isNullOrEmpty()) {
             Text(
                 text = errorMessage,
                 color = GBError,

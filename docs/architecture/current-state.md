@@ -5,8 +5,8 @@
 La base del proyecto es un monorepo TypeScript con `pnpm` y tres aplicaciones principales:
 
 - `apps/api`: backend en Node.js + Express + MongoDB/Mongoose
-- `apps/web`: app web placeholder con React Native Web
-- `apps/mobile`: placeholder de React Native
+- `apps/web`: aplicación React con sesión y catálogo de productos conectado a la API
+- `apps/mobile`: aplicación Android nativa Kotlin/Jetpack Compose con cliente REST y sesión cifrada
 
 La estructura del backend sigue un patrón modular por dominio bajo `apps/api/src/modules`, con una capa compartida en `apps/api/src/modules/shared` que incluye utilidades, validadores, repositorios, errores y respuestas. La capa de routing centraliza módulos en `apps/api/src/routes/index.ts`.
 
@@ -22,7 +22,7 @@ El backend está parcialmente implementado y presenta una estructura clara:
 - `apps/api/src/config/env.ts`: carga de variables de entorno
 - `apps/api/src/config/database.ts`: conexión a MongoDB
 - `apps/api/src/middleware`: autenticación, tenant, rate limiting, errores, auditoría
-- `apps/api/src/modules/*`: módulos `auth`, `companies`, `branches`, `roles`, `settings`, `users`, `audit`
+- `apps/api/src/modules/*`: módulos `auth`, `companies`, `branches`, `roles`, `settings`, `users`, `audit` y `products`
 - `apps/api/src/modules/shared`: repositorios, validadores, errores, respuestas, utilidades
 - `apps/api/src/servers/http.ts`: inicio del servidor
 
@@ -32,6 +32,7 @@ El backend está parcialmente implementado y presenta una estructura clara:
 - Conexión a MongoDB a través de Mongoose
 - Healthcheck `/health`
 - Rutas CRUD básicas para auth, companies, branches, roles, users, settings y audit
+- CRUD tenant-scoped de productos y movimientos de inventario transaccionales
 - Middleware base de autenticación y validación de tenant
 - Rate limiting por API
 - Respuestas API con `success` / `error` estructurados
@@ -42,34 +43,34 @@ El backend está parcialmente implementado y presenta una estructura clara:
 
 - No existe una verdadera capa de repositorios por dominio, solo una base genérica
 - No hay validación de params/query de forma consistente en todos los endpoints
-- No hay transacciones ni contención sobre operaciones multi-entidad
+- Las transacciones se usan para actualizar stock y registrar su movimiento; otras operaciones multi-entidad aún requieren revisión
 - No hay registro real de auditoría persistente; el middleware encola entradas en memoria, no las guarda en base de datos
-- No hay negocio real para inventario, ventas, compras, pagos ni financiamiento
-- No hay frontend conectado con la API, ni cliente API centralizado real en `apps/web`
-- El `mobile` es un stub y no se ejecuta como app real
+- No hay módulos completos de ventas, compras, pagos ni financiamiento
+- Las pruebas locales no escriben datos en una instancia MongoDB real
 
 ## Frontend
 
 ### Estado real
 
-El frontend web existe solo como estructura mínima:
+La web conserva la autenticación existente y ahora incluye el flujo de productos:
 
 - `apps/web/package.json` indica React + React Native Web + Zustand + Axios
-- `apps/web/src/index.ts` es un placeholder
-- No hay `app`, `features`, `components` reales en flujo de aplicación
-- No hay routing, shell, dashboard, páginas, autenticación ni módulos ERP consumiendo API
+- `apps/web/src/api/client.ts` consume la API configurada mediante `ERP_API_BASE_URL`
+- usuarios autenticados pueden listar, buscar, crear, editar y desactivar productos
+- el flujo web registra movimientos de inventario y muestra existencias/historial
 
 ### Observación
 
-El proyecto documenta que el frontend debe ser `React Native Web`, pero actualmente no está conectado ni implementado más allá de un stub. Esto deja el sistema con API backend parcialmente usable pero sin capa de presentación funcional.
+La web es una interfaz inicial enfocada en productos; no representa todavía una suite ERP completa.
 
 ## Mobile
 
-El móvil también es un stub:
+El proyecto Android usa Kotlin y Jetpack Compose, no React Native ni WebView:
 
-- `apps/mobile/src/index.ts` registra `AppRegistry`, pero la app no existe realmente
-- No hay navegación ni features reales
-- No hay diseño ni flujo de autenticación ni ERP
+- Retrofit consume la misma API pública que la web
+- login y refresh conservan tokens en `EncryptedSharedPreferences`
+- catálogo, detalle, edición y movimientos de inventario usan las rutas de productos
+- el APK no se pudo compilar en el entorno inspeccionado por falta de JDK 17 y SDK Platform 35/Build Tools 35.0.0
 
 ## Packages
 
@@ -87,7 +88,7 @@ El esquema es útil, pero aún no centraliza todos los contratos del negocio ni 
 
 ### `packages/validation`
 
-Contiene validadores con Zod para auth, users, companies, branches y paginación.
+Contiene validadores con Zod para auth, users, companies, branches, productos e inventario, además de paginación.
 
 La validación es útil, pero aún no cubre:
 
@@ -120,14 +121,17 @@ Modelos concretos observados:
 - `Setting`
 - `AuditLog`
 - `Token`
+- `Product`
+- `InventoryMovement`
 
 ### Observaciones
 
 - Hay índices de `tenantId` y `branchId` en varios modelos
 - La base de datos está pensada para multiempresa y multisucursal
 - El uso de `tenantId` está dentro del modelo de datos, pero la validación de acceso está principalmente en middleware y no en repositorios ni políticas por entidad a nivel transversal
-- No hay evidencia de modelos para productos, inventario, ventas, compras, pagos, finanzas, clientes, proveedores, etc.
-- No hay trazabilidad de movimientos de inventario ni esquema de transacciones para órdenes y pagos
+- Productos y movimientos de inventario incluyen `tenantId`; las bajas son lógicas
+- Las entradas/salidas actualizan stock y registran el movimiento en una transacción
+- No hay módulos completos para ventas, compras, pagos, finanzas, clientes o proveedores
 
 ## Auth
 
@@ -279,6 +283,7 @@ Hay tests de Jest configurados, pero aún son muy pequeños:
 - Gestión básica de sucursales
 - Gestión básica de roles
 - Gestión básica de configuración por tenant
+- Catálogo de productos y movimientos de inventario por tenant
 - Auditoría base y middleware
 - Rate limiting básico y seguridad HTTP
 - Monorepo con packages compartidos
@@ -287,14 +292,10 @@ Hay tests de Jest configurados, pero aún son muy pequeños:
 
 - Dashboard ERP real
 - Clientes, contactos y CRM
-- Productos, unidades, precios, categorías y tax
-- Inventario, stock, movimientos, ajustes, transferencias
 - Ventas, cotizaciones, órdenes, facturas
 - Compras, proveedores, órdenes de compra, recepciones
 - Finance y contabilidad
 - Reportes y exportación
-- Mobile real
-- Shell de web con navegación y app shell profesional
 - APIs de negocio completas
 - Permisos granulares por módulo y recurso
 - Sesiones, seguridad y audit trail

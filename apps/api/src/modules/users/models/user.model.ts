@@ -44,7 +44,6 @@ const userSchema = new Schema<IUser>(
 );
 
 userSchema.index({ tenantId: 1, email: 1 });
-userSchema.index({ branchId: 1 });
 userSchema.index({ roleId: 1 });
 userSchema.index(
   { isPrimaryAdmin: 1 },

@@ -49,14 +49,31 @@ http://localhost:3000/api/v1
 | Método | Endpoint | Descripción | Auth |
 |--------|----------|-------------|------|
 | POST | `/api/v1/auth/login` | Iniciar sesión | No |
-| POST | `/api/v1/auth/register` | Crear empresa, administrador inicial y sesión | No |
+| POST | `/api/v1/auth/register` | Crear empresa y usuario normal inicial | No |
 | POST | `/api/v1/auth/refresh` | Renovar token | No |
 | POST | `/api/v1/auth/logout` | Cerrar sesión | Si |
 | POST | `/api/v1/auth/logout-all` | Cerrar todas las sesiones | Si |
 | POST | `/api/v1/auth/forgot-password` | Solicitar recuperación | No |
 | PUT | `/api/v1/auth/change-password` | Cambiar contraseña | Si |
 
-`/auth/register` recibe `firstName`, `lastName`, `email`, `password` (mínimo 8 caracteres) y `companyName`. El RUC no es necesario para el alta; puede completarse después al actualizar los datos de la empresa. El alta crea un tenant aislado, su empresa y su primer administrador con permisos de los módulos backend disponibles, y devuelve la sesión para ingresar de inmediato.
+`/auth/register` recibe `firstName`, `lastName`, `email`, `password` (mínimo 8 caracteres) y `companyName`. El alta crea un tenant aislado, su empresa, el rol estándar y el usuario. La respuesta es un mensaje de confirmación; después del registro se inicia sesión normalmente. `emailVerified` no se exige para iniciar sesión. El acceso a Productos e Inventario requiere una sesión válida y queda limitado al tenant del JWT, no depende de `ADMIN_EMAIL` ni de `isPrimaryAdmin`.
+
+## Productos e inventario
+
+Todas las rutas requieren `Authorization: Bearer <accessToken>` y operan exclusivamente dentro del tenant asociado al token. No requieren permisos de administrador ni aceptan un `tenantId` proporcionado por el cliente.
+
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/api/v1/products?search=<texto>` | Buscar/listar hasta 200 productos del tenant por nombre, SKU o categoría |
+| POST | `/api/v1/products` | Crear producto |
+| GET | `/api/v1/products/:id` | Obtener producto del tenant; `:id` es `_id` Mongo |
+| PUT | `/api/v1/products/:id` | Actualizar datos del producto; el stock se modifica mediante movimientos |
+| PATCH | `/api/v1/products/:id/status` | Activar o desactivar con `{ "status": "active" \| "inactive" }` |
+| DELETE | `/api/v1/products/:id` | Baja lógica: marca el producto como inactivo |
+| GET | `/api/v1/products/:id/inventory` | Consultar los últimos 100 movimientos del producto |
+| POST | `/api/v1/products/:id/inventory` | Registrar entrada/salida y actualizar stock en una transacción |
+
+El cuerpo de creación acepta `name`, `sku`, `description`, `category`, `costPrice`, `salePrice`, `stock` inicial, `minimumStock`, `unit` y `status`; los campos opcionales tienen valores predeterminados y precios/stock no pueden ser negativos. El SKU es único por tenant. Para movimientos se envía `{ "type": "entry" | "exit", "quantity": <número positivo>, "notes": "" }`. Las salidas se rechazan si exceden el stock y los movimientos se guardan junto con la actualización de existencias en la misma transacción de MongoDB.
 
 ## Endpoints de Usuarios
 
@@ -136,7 +153,7 @@ La aplicación web llama los paths relativos a `/api/v1`. Las respuestas de éxi
 | Método y path | Parámetros/cuerpo | Respuesta de datos | Permiso |
 |---|---|---|---|
 | `POST /auth/login` | `{ email, password }` | Sesión `{ accessToken, refreshToken, user }` | Público |
-| `POST /auth/register` | `{ firstName, lastName, email, password, companyName }` | 201; sesión inicial | Público |
+| `POST /auth/register` | `{ firstName, lastName, email, password, companyName }` | 201; mensaje de registro | Público |
 | `POST /auth/refresh` | `{ refreshToken }` | `{ accessToken }` | Público, validado por refresh token |
 | `POST /auth/logout` | `{ refreshToken }` | `{ success: true }` | Bearer; sesión actual |
 | `POST /auth/logout-all` | sin cuerpo | `{ success: true }` | Bearer; sesión actual |
@@ -162,8 +179,16 @@ La aplicación web llama los paths relativos a `/api/v1`. Las respuestas de éxi
 | `DELETE /settings/:key` | `:key` es la clave pública, no `_id` | `{ deleted: true }` | `settings:delete` |
 | `GET /audit?page=&limit=` | opcional; predeterminados 1 y 20 | Página `{ data, total, page, limit, hasMore }` | `audit:read` |
 | `GET /audit/module/:module?page=&limit=` | `:module` y paginación opcional | Página filtrada por módulo y tenant | `audit:read` |
+| `GET /products?search=` | Búsqueda opcional por nombre, SKU o categoría | Arreglo de productos del tenant (máximo 200) | Bearer + tenant |
+| `POST /products` | Producto; no acepta tenant del cliente | 201; producto creado | Bearer + tenant |
+| `GET /products/:id` | `:id` es `_id` Mongo | Producto del tenant | Bearer + tenant |
+| `PUT /products/:id` | Campos parciales de producto, sin modificar stock | Producto actualizado | Bearer + tenant |
+| `PATCH /products/:id/status` | `{ status: "active" \| "inactive" }` | Estado actualizado | Bearer + tenant |
+| `DELETE /products/:id` | Baja lógica, no borra documentos ni movimientos | Producto inactivo | Bearer + tenant |
+| `GET /products/:id/inventory` | `:id` es `_id` Mongo | Movimientos recientes del tenant | Bearer + tenant |
+| `POST /products/:id/inventory` | `{ type: "entry" \| "exit", quantity, notes? }` | `{ product, movement }` | Bearer + tenant |
 
-Todos los endpoints de datos pasan por `authenticateToken` y `validateTenant`; el `tenantId` se toma del JWT, nunca del formulario. El frontend oculta acciones sin permiso solo para UX: la API vuelve a validar cada permiso y tenant. El endpoint `GET /health` no requiere token. No existe endpoint de dashboard.
+Todos los endpoints de datos pasan por `authenticateToken` y `validateTenant`; el `tenantId` se toma del JWT, nunca del formulario. Los módulos administrativos históricos aplican permisos RBAC; Productos e Inventario están disponibles para cualquier usuario autenticado del tenant. El endpoint `GET /health` no requiere token. No existe endpoint HTTP de bootstrap administrativo ni endpoint de dashboard.
 
 Notas de implementación verificadas:
 - El frontend compila `ERP_API_BASE_URL` en `apps/web` (script de build/dev basado en esbuild); en desarrollo local, si no está definida, usa `http://<host>:3000/api/v1`. En producción configúrala en el entorno de build del Static Site, sin incluir credenciales.

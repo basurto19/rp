@@ -1,10 +1,9 @@
 import dotenv from 'dotenv';
-import dns from 'node:dns';
 import path from 'node:path';
 import mongoose from 'mongoose';
+import { configureDns } from './dns';
 
 dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
-dns.setServers(['8.8.8.8', '8.8.4.4']);
 
 export const connectDB = async (): Promise<void> => {
   try {
@@ -15,6 +14,7 @@ export const connectDB = async (): Promise<void> => {
       throw new Error('MONGODB_URI and MONGODB_DB_NAME are required');
     }
 
+    configureDns();
     await mongoose.connect(uri, {
       dbName,
       serverSelectionTimeoutMS: 5_000,

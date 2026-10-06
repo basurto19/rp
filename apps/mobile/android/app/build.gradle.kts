@@ -7,10 +7,19 @@ plugins {
     kotlin("kapt")
 }
 
+val apiBaseUrl = providers.gradleProperty("erpApiBaseUrl")
+    .orElse(providers.environmentVariable("ERP_API_BASE_URL"))
+    .orElse("https://erp-api-7y90.onrender.com/api/v1")
+    .get()
+    .trimEnd('/') + "/"
+
+require(apiBaseUrl.startsWith("https://")) {
+    "ERP_API_BASE_URL must use HTTPS."
+}
+
 android {
     namespace = "com.gberp.app"
     compileSdk = 35
-    buildToolsVersion = "36.0.0"
 
     defaultConfig {
         applicationId = "com.gberp.app"
@@ -24,7 +33,7 @@ android {
             useSupportLibrary = true
         }
 
-        buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:3000/api/v1/\"")
+        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
     }
 
     buildTypes {
@@ -34,10 +43,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            buildConfigField("String", "API_BASE_URL", "\"https://api.gberp.com/api/v1/\"")
-        }
-        debug {
-            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:3000/api/v1/\"")
         }
     }
 
@@ -88,7 +93,6 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.kotlinx.serialization)
     implementation(libs.okhttp)
-    implementation(libs.okhttp.logging.interceptor)
 
     // Serialization & Security
     implementation(libs.kotlinx.serialization.json)

@@ -21,6 +21,7 @@ import {
   updateCompanySchema,
   updateUserSchema,
 } from '@erp/validation';
+import { ProductsWorkspace } from './products/ProductsWorkspace';
 
 interface TextInputProps {
   nativeID?: string;
@@ -872,6 +873,10 @@ function App() {
       formatCell(value).toLocaleLowerCase().includes(search.toLocaleLowerCase()),
     ),
   );
+
+  if (Boolean(session)) {
+    return <ProductsWorkspace session={session!} onLogout={handleLogout} />;
+  }
 
   if (!session) {
     return (
