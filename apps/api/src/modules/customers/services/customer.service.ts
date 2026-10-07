@@ -104,6 +104,13 @@ export class CustomerService {
     }
   }
 
+  async remove(tenantId: string, customerId: string): Promise<unknown> {
+    if (!mongoose.isValidObjectId(customerId)) throw new AppError('VALIDATION_ERROR', 'El identificador del cliente no es válido', 400);
+    const customer = await Customer.findOneAndUpdate({ _id: customerId, tenantId }, { $set: { status: 'inactive' } }, { new: true }).lean().exec();
+    if (!customer) throw new AppError('RESOURCE_NOT_FOUND', 'Cliente no encontrado', 404);
+    return { deleted: true, softDeleted: true };
+  }
+
   async setStatus(tenantId: string, customerId: string, status: 'active' | 'inactive'): Promise<unknown> {
     if (!mongoose.isValidObjectId(customerId)) {
       throw new AppError('VALIDATION_ERROR', 'El identificador del cliente no es válido', 400);

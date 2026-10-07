@@ -22,6 +22,7 @@ import {
   updateUserSchema,
 } from '@erp/validation';
 import { ProductsWorkspace } from './products/ProductsWorkspace';
+import { RecordsWorkspace } from './operations/RecordsWorkspace';
 
 interface TextInputProps {
   nativeID?: string;
@@ -1240,8 +1241,10 @@ function App() {
           </View>
         </View>
 
-        {activeModule === 'products' ? (
+        {activeModule === 'products' || activeModule === 'inventory' ? (
           <ProductsWorkspace session={session} onLogout={handleLogout} />
+        ) : activeModule === 'customers' || activeModule === 'suppliers' || activeModule === 'sales' ? (
+          <RecordsWorkspace kind={activeModule} session={session} />
         ) : operationalModules.some((module) => module.id === activeModule) ? (
           <View className="workspace-main">
             <View className="page-heading">

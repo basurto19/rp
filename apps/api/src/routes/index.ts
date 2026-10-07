@@ -10,6 +10,7 @@ import { auditRoutes } from '../modules/audit/routes/audit.routes';
 import { productRoutes } from '../modules/products/routes/product.routes';
 import { customerRoutes } from '../modules/customers/routes/customer.routes';
 import { saleRoutes } from '../modules/sales/routes/sale.routes';
+import { supplierRoutes } from '../modules/suppliers/routes/supplier.routes';
 
 export const routes: Router = Router();
 
@@ -23,6 +24,7 @@ routes.use('/audit', auditRoutes);
 routes.use('/products', productRoutes);
 routes.use('/customers', customerRoutes);
 routes.use('/sales', saleRoutes);
+routes.use('/suppliers', supplierRoutes);
 
 routes.get('/health', (_req, res) => {
   res.json({ success: true, data: { status: 'ok' } });

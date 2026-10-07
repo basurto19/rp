@@ -24,3 +24,4 @@ customerRoutes.get('/:id', asyncRoute(controller.getById.bind(controller)));
 customerRoutes.put('/:id', asyncRoute(controller.update.bind(controller)));
 customerRoutes.patch('/:id', asyncRoute(controller.update.bind(controller)));
 customerRoutes.patch('/:id/status', asyncRoute(controller.setStatus.bind(controller)));
+customerRoutes.delete('/:id', asyncRoute(controller.remove.bind(controller)));

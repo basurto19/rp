@@ -103,6 +103,11 @@ export class CustomerController {
     }
   }
 
+  async remove(request: Request, response: Response): Promise<Response> {
+    try { return successResponse(response, await this.service.remove((request as AuthenticatedRequest).tenantId, String(request.params.id))); }
+    catch (error) { if (error instanceof AppError) return errorResponse(response, error); throw error; }
+  }
+
   async setStatus(request: Request, response: Response): Promise<Response> {
     const customerId = String(request.params.id);
     const status = request.body?.status;

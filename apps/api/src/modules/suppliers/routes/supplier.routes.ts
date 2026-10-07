@@ -1,0 +1,10 @@
+import { Router, type Router as ExpressRouter } from 'express';
+import { authenticateToken,validateTenant } from '../../../middleware';
+import { SupplierController } from '../controllers/supplier.controller';
+export const supplierRoutes: ExpressRouter=Router(); const controller=new SupplierController();
+supplierRoutes.use(authenticateToken,validateTenant);
+supplierRoutes.get('/',(req,res,next)=>{void controller.list(req,res).catch(next);});
+supplierRoutes.post('/',(req,res,next)=>{void controller.create(req,res).catch(next);});
+supplierRoutes.put('/:id',(req,res,next)=>{void controller.update(req,res).catch(next);});
+supplierRoutes.patch('/:id',(req,res,next)=>{void controller.update(req,res).catch(next);});
+supplierRoutes.delete('/:id',(req,res,next)=>{void controller.remove(req,res).catch(next);});
