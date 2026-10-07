@@ -221,6 +221,7 @@ const moduleDefinitions: ModuleDefinition[] = [
       { key: 'firstName', label: 'Nombre' },
       { key: 'lastName', label: 'Apellido' },
       { key: 'email', label: 'Correo' },
+      { key: 'isPrimaryAdmin', label: 'Administrador' },
       { key: 'roleId', label: 'Rol' },
       { key: 'tenantId', label: 'Tenant' },
       { key: 'status', label: 'Estado' },
@@ -237,6 +238,15 @@ const moduleDefinitions: ModuleDefinition[] = [
       { key: 'firstName', label: 'Nombre', maxLength: 100 },
       { key: 'lastName', label: 'Apellido', maxLength: 100 },
       { key: 'branchId', label: 'ID de sucursal', required: false },
+      {
+        key: 'isPrimaryAdmin',
+        label: 'Tipo de acceso',
+        type: 'select',
+        options: [
+          { label: 'Usuario normal', value: 'false' },
+          { label: 'Administrador', value: 'true' },
+        ],
+      },
       {
         key: 'status',
         label: 'Estado',
@@ -505,6 +515,7 @@ function initialFormValues(
     values.scope = 'company';
   }
   if (module.id === 'settings' && mode === 'create') values.type = 'string';
+  if (module.id === 'users' && mode === 'edit' && values.isPrimaryAdmin === '') values.isPrimaryAdmin = 'false';
   return values;
 }
 
@@ -532,6 +543,9 @@ function formPayload(
     else payload.value = rawValue;
   }
   if (module.id === 'users' && payload.branchId === '') delete payload.branchId;
+  if (module.id === 'users' && typeof payload.isPrimaryAdmin === 'string') {
+    payload.isPrimaryAdmin = payload.isPrimaryAdmin === 'true';
+  }
   return payload;
 }
 
@@ -1243,7 +1257,7 @@ function App() {
 
         {activeModule === 'products' || activeModule === 'inventory' ? (
           <ProductsWorkspace session={session} onLogout={handleLogout} />
-        ) : activeModule === 'customers' || activeModule === 'suppliers' || activeModule === 'sales' ? (
+        ) : activeModule === 'customers' || activeModule === 'suppliers' || activeModule === 'sales' || activeModule === 'purchases' ? (
           <RecordsWorkspace kind={activeModule} session={session} />
         ) : operationalModules.some((module) => module.id === activeModule) ? (
           <View className="workspace-main">

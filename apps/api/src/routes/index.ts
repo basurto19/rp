@@ -11,6 +11,7 @@ import { productRoutes } from '../modules/products/routes/product.routes';
 import { customerRoutes } from '../modules/customers/routes/customer.routes';
 import { saleRoutes } from '../modules/sales/routes/sale.routes';
 import { supplierRoutes } from '../modules/suppliers/routes/supplier.routes';
+import { purchaseRoutes } from '../modules/purchases/routes/purchase.routes';
 
 export const routes: Router = Router();
 
@@ -25,6 +26,7 @@ routes.use('/products', productRoutes);
 routes.use('/customers', customerRoutes);
 routes.use('/sales', saleRoutes);
 routes.use('/suppliers', supplierRoutes);
+routes.use('/purchases', purchaseRoutes);
 
 routes.get('/health', (_req, res) => {
   res.json({ success: true, data: { status: 'ok' } });

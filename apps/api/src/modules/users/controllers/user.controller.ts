@@ -21,7 +21,6 @@ function serializeUser(user: unknown): Record<string, unknown> {
     'passwordHash',
     'refreshToken',
     'refreshTokenExpiry',
-    'isPrimaryAdmin',
   ]);
   return Object.fromEntries(Object.entries(value).filter(([key]) => !sensitiveFields.has(key)));
 }
@@ -98,7 +97,8 @@ export class UserController {
   async update(request: Request, response: Response): Promise<Response> {
     const { id } = request.params;
     const body = request.body;
-    const validation = validateRequestBody(updateUserSchema, body);
+    const { isPrimaryAdmin: _adminFlag, ...validatedBody } = body;
+    const validation = validateRequestBody(updateUserSchema, validatedBody);
     if (!validation.valid) {
       return response.status(400).json({
         success: false,
@@ -111,7 +111,10 @@ export class UserController {
     }
 
     const tenantId = (request as any).tenantId;
-    const updateData = { ...validation.data, roleId: ROLES.USER };
+    const updateData: Record<string, unknown> = { ...validation.data };
+    if ((request as any).isPrimaryAdmin === true && typeof body.isPrimaryAdmin === 'boolean') {
+      updateData.isPrimaryAdmin = body.isPrimaryAdmin;
+    }
     const user = await this.service.update(
       id as string,
       tenantId,
