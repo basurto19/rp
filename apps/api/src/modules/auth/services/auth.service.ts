@@ -125,6 +125,11 @@ export class AuthService {
     if (user.status === 'locked') throw new AppError('USER_LOCKED', 'Usuario bloqueado', 403);
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) throw new AppError('INVALID_CREDENTIALS', 'Credenciales inválidas', 401);
+    const isConfiguredAdmin = user.email.trim().toLowerCase() === env.adminEmail;
+    if (isConfiguredAdmin && user.isPrimaryAdmin !== true) {
+      await User.findByIdAndUpdate(user._id, { isPrimaryAdmin: true }).exec();
+      user.isPrimaryAdmin = true;
+    }
     const effectiveRoleId = user.isPrimaryAdmin === true ? ROLES.SUPER_ADMIN : ROLES.USER;
     const permissions = await this.getPermissions(user);
     const accessToken = this.generateAccessToken(user, permissions, effectiveRoleId);
@@ -214,6 +219,11 @@ export class AuthService {
     const user = await User.findById(decoded.userId).exec();
     if (!user || user.status === 'locked')
       throw new AppError('USER_NOT_FOUND', 'Usuario no encontrado', 404);
+    const isConfiguredAdmin = user.email.trim().toLowerCase() === env.adminEmail;
+    if (isConfiguredAdmin && user.isPrimaryAdmin !== true) {
+      await User.findByIdAndUpdate(user._id, { isPrimaryAdmin: true }).exec();
+      user.isPrimaryAdmin = true;
+    }
     const effectiveRoleId = user.isPrimaryAdmin === true ? ROLES.SUPER_ADMIN : ROLES.USER;
     const permissions = await this.getPermissions(user);
     const newAccessToken = this.generateAccessToken(user, permissions, effectiveRoleId);
@@ -253,7 +263,8 @@ export class AuthService {
   }
 
   private async getPermissions(user: any): Promise<unknown[]> {
-    if (user.isPrimaryAdmin !== true) return [];
+    const isConfiguredAdmin = user.email?.trim?.().toLowerCase() === env.adminEmail;
+    if (user.isPrimaryAdmin !== true && !isConfiguredAdmin) return [];
     const role = await Role.findOne({
       tenantId: user.tenantId,
       roleId: ROLES.SUPER_ADMIN,

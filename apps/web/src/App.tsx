@@ -633,6 +633,18 @@ function App() {
   }, []);
 
   const moduleIds = useMemo(() => new Set(moduleDefinitions.map((module) => module.id)), []);
+  const operationalModules = useMemo(
+    () => [
+      { id: 'products', label: 'Productos', endpoint: '/products' },
+      { id: 'customers', label: 'Clientes', endpoint: '/customers' },
+      { id: 'sales', label: 'Ventas', endpoint: '/sales' },
+      { id: 'inventory', label: 'Inventario', endpoint: '/products' },
+      { id: 'suppliers', label: 'Proveedores', endpoint: '' },
+      { id: 'purchases', label: 'Compras', endpoint: '' },
+      { id: 'reports', label: 'Reportes', endpoint: '' },
+    ],
+    [],
+  );
   const visibleModules = useMemo(
     () =>
       session
@@ -640,16 +652,18 @@ function App() {
         : [],
     [session],
   );
+  const enabledModuleCount = operationalModules.length + visibleModules.length;
   const selectedModule = moduleDefinitions.find((module) => module.id === activeModule);
   const guardedModule = session ? guardModule(session.user, activeModule, moduleIds) : 'dashboard';
 
   useEffect(() => {
     // Operational workspaces such as Products are available to every authenticated tenant user.
     // Only legacy administrative modules are permission-guarded.
-    if (session && activeModule !== 'products' && guardedModule !== activeModule) {
+    const isOperational = operationalModules.some((module) => module.id === activeModule);
+    if (session && !isOperational && guardedModule !== activeModule) {
       setActiveModule(guardedModule);
     }
-  }, [activeModule, guardedModule, session]);
+  }, [activeModule, guardedModule, operationalModules, session]);
 
   useEffect(() => {
     if (
@@ -1147,15 +1161,18 @@ function App() {
         </View>
         <View className="nav-section">
           <Text className="sidebar-label">OPERACIÓN</Text>
-          <Pressable
-            className={`nav-item${activeModule === 'products' ? ' active' : ''}`}
-            onPress={() => setActiveModule('products')}
-            accessibilityRole="button"
-            accessibilityState={{ selected: activeModule === 'products' }}
-          >
-            <Text className="nav-item-text">Productos</Text>
-            <Text className="nav-access">100</Text>
-          </Pressable>
+          {operationalModules.map((module) => (
+            <Pressable
+              key={module.id}
+              className={`nav-item${activeModule === module.id ? ' active' : ''}`}
+              onPress={() => setActiveModule(module.id)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: activeModule === module.id }}
+            >
+              <Text className="nav-item-text">{module.label}</Text>
+              <Text className="nav-access">{module.endpoint ? 'API' : 'NUEVO'}</Text>
+            </Pressable>
+          ))}
         </View>
         <View className="nav-section">
           <Text className="sidebar-label">ADMINISTRACIÓN</Text>
@@ -1225,6 +1242,32 @@ function App() {
 
         {activeModule === 'products' ? (
           <ProductsWorkspace session={session} onLogout={handleLogout} />
+        ) : operationalModules.some((module) => module.id === activeModule) ? (
+          <View className="workspace-main">
+            <View className="page-heading">
+              <View>
+                <Text className="eyebrow">OPERACIÓN / ERP</Text>
+                <Text accessibilityRole="header" className="page-title">
+                  {operationalModules.find((module) => module.id === activeModule)?.label}
+                </Text>
+                <Text className="page-description">
+                  Módulo integrado al ERP de Apta Digital.
+                </Text>
+              </View>
+              <View className="live-badge"><View className="live-dot" /><Text className="live-badge-text">Disponible</Text></View>
+            </View>
+            <View className="content-panel">
+              <View className="panel-heading">
+                <Text className="panel-title">{operationalModules.find((module) => module.id === activeModule)?.label}</Text>
+                <Text className="panel-meta">Espacio de trabajo</Text>
+              </View>
+              <Text className="empty-message">
+                {['customers', 'sales', 'inventory'].includes(activeModule)
+                  ? 'La API de este módulo ya está conectada. La interfaz operativa completa se está integrando sobre este espacio.'
+                  : 'Módulo preparado en la navegación del ERP. Su flujo de datos se integrará sin cambiar el diseño general.'}
+              </Text>
+            </View>
+          </View>
         ) : (
         <View className="workspace-main">
           {activeModule === 'dashboard' ? (
@@ -1254,8 +1297,8 @@ function App() {
               <View className="dashboard-summary">
                 <View className="summary-card">
                   <Text className="summary-label">Módulos habilitados</Text>
-                  <Text className="summary-value">{visibleModules.length}</Text>
-                  <Text className="summary-foot">Según los permisos de tu sesión</Text>
+                  <Text className="summary-value">{enabledModuleCount}</Text>
+                  <Text className="summary-foot">Operación y administración disponibles</Text>
                 </View>
                 <View className="summary-card">
                   <Text className="summary-label">Rol actual</Text>
@@ -1275,6 +1318,20 @@ function App() {
                   <Text className="panel-title">Tus módulos</Text>
                   <Text className="panel-meta">Acceso de lectura disponible</Text>
                 </View>
+                {operationalModules.map((module) => (
+                  <Pressable
+                    key={module.id}
+                    className="module-link"
+                    onPress={() => setActiveModule(module.id)}
+                    accessibilityRole="button"
+                  >
+                    <View>
+                      <Text className="module-link-title">{module.label}</Text>
+                      <Text className="module-link-path">{module.endpoint || 'Módulo ERP'}</Text>
+                    </View>
+                    <Text className="module-link-action">Abrir</Text>
+                  </Pressable>
+                ))}
                 {visibleModules.length ? (
                   visibleModules.map((module) => (
                     <Pressable
